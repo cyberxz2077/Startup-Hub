@@ -1,0 +1,77 @@
+{
+  "version": "1.0",
+  "stage": "prd",
+  "app_name": "Startup Hub",
+  "modules": [
+    "auth",
+    "chat",
+    "profile",
+    "note"
+  ],
+  "config": {
+    "client_id": "28454aca-bb08-4232-a5e6-ed590dda8748",
+    "client_secret": "ae1b39d6c5db5acadfc3c5e204bde4f7e4b6ecf703604b413b7802871ad50893",
+    "redirect_uri": "http://localhost:3000/api/auth/callback",
+    "redirect_uris": [
+      "http://localhost:3000/api/auth/callback"
+    ],
+    "database_url": "file:./dev.db",
+    "allowed_scopes": [
+      "user.info.shades",
+      "user.info",
+      "user.info.softmemory",
+      "chat",
+      "note.add",
+      "voice"
+    ]
+  },
+  "api": {
+    "base_url": "https://app.mindos.com/gate/lab",
+    "oauth_url": "https://go.second.me/oauth/",
+    "token_endpoint": "https://app.mindos.com/gate/lab/api/oauth/token",
+    "access_token_ttl": 7200,
+    "refresh_token_ttl": 2592000
+  },
+  "docs": {
+    "quickstart": "https://develop-docs.second.me/zh/docs",
+    "oauth2": "https://develop-docs.second.me/zh/docs/authentication/oauth2",
+    "api_reference": "https://develop-docs.second.me/zh/docs/api-reference/secondme",
+    "errors": "https://develop-docs.second.me/zh/docs/errors"
+  },
+  "prd": {
+    "summary": "Startup Hub 是一个 AI 驱动的创业团队组队招募平台。为创始人提供智能匹配、AI 分身预面试功能,为求职者提供项目橱窗和 AI to AI 匹配对话,同时展示投资方、孵化器等服务商资源。",
+    "features": [
+      "创始人发布项目和招聘需求,系统自动匹配前 20% 相关用户,AI 分身对话补全信息,输出匹配度评分和联系方式",
+      "求职者浏览项目橱窗,一键发起 AI to AI 对话,匹配度大于 85 分可获得创始人联系方式,管理感兴趣项目列表",
+      "服务商展示页(投资方、孵化器、社群、咖啡店等),分类轮播图、筛选列表页、详情页展示"
+    ],
+    "target_users": "创业创始人和希望加入创业团队的各类专业人才",
+    "design_preference": "简约现代,与现有 Startup Hub v0.5 保持一致,不做大幅调整",
+    "integration_mode": "智能增强模式 - 保留 Gemini AI 功能,增加 SecondMe OAuth 和 AI 匹配能力",
+    "auth_strategy": "强制使用 SecondMe 登录才能使用核心功能",
+    "profile_import": {
+      "fields": [
+        "基础信息(昵称、头像、简介)",
+        "兴趣标签 → 技能标签",
+        "软记忆 → 履历经验"
+      ],
+      "editable": true,
+      "sync_back": true,
+      "description": "允许编辑修改,修改后回传 SecondMe 增补信息"
+    },
+    "chat_scenarios": [
+      "创始人与候选人的 SecondMe AI 分身聊天(预面试)",
+      "保存聊天历史到本地数据库供用户回顾"
+    ],
+    "note_triggers": [
+      "项目发布时自动保存项目摘要到 SecondMe",
+      "个人资料完成时保存为个人知识库"
+    ],
+    "preserve_existing": [
+      "首页及网页框架",
+      "登陆页分支流程",
+      "项目录入页",
+      "用户档案录入页"
+    ]
+  }
+}

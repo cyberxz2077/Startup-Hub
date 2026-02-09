@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户表 - 存储 SecondMe 用户信息和 Token
+model User {
+  id                String   @id @default(cuid())
+  secondmeUserId    String   @unique @map("secondme_user_id")
+  name              String?
+  avatar            String?
+  bio               String?
+  
+  // OAuth Token 字段
+  accessToken       String   @map("access_token")
+  refreshToken      String   @map("refresh_token")
+  tokenExpiresAt    DateTime @map("token_expires_at")
+  
+  // 关联关系
+  projects          Project[]
+  profile           Profile?
+  chatSessions      ChatSession[]
+  matchingResults   MatchingResult[]
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  
+  @@map("users")
+}
+
+// 用户资料表 - 对应 ProfileData
+model Profile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique @map("user_id")
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title                 String?  // 职位/头衔
+  location              String?
+  skills                Json?    // 原生 Json 存储技能列表
+  experienceHighlights  String?  @map("experience_highlights")
+  education             String?
+  lookingFor            String?  @map("looking_for")  // 寻找的机会
+  superpower            String?  // 个人超能力
+  others                Json?    // 其他信息
+  
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  
+  @@map("profiles")
+}
+
+// 项目表 - 对应 ProjectData
+model Project {
+  id                   String   @id @default(cuid())
+  ownerId              String   @map("owner_id")
+  owner                User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  
+  name                 String
+  oneLiner             String?  @map("one_liner")
+  sector               String?
+  location             String?
+  stage                String?
+  
+  vision               String?
+  problem              String?
+  solution             String?
+  talentNeeds          Json?    @map("talent_needs") // 原生 Json
+  
+  productHighlights    String?  @map("product_highlights")
+  targetAudience       String?  @map("target_audience")
+  businessModel        String?  @map("business_model")
+  differentiation      String?
+  marketSize           String?  @map("market_size")
+  teamMembers          String?  @map("team_members")
+  whyNow               String?  @map("why_now")
+  longTermMoat         String?  @map("long_term_moat")
+  roadmapFinance       String?  @map("roadmap_finance")
+  others               Json?
+  
+  published            Boolean  @default(false)
+  
+  matchingResults      MatchingResult[]
+  
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+  
+  @@map("projects")
+}
+
+// 聊天会话表
+model ChatSession {
+  id            String   @id @default(cuid())
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  targetType    String   @map("target_type")  // "project" or "user"
+  targetId      String   @map("target_id")
+  
+  messages      ChatMessage[]
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@map("chat_sessions")
+}
+
+// 聊天消息表
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String      @map("session_id")
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  role          String      // "user" or "assistant"
+  content       String
+  
+  createdAt     DateTime    @default(now()) @map("created_at")
+  
+  @@map("chat_messages")
+}
+
+// 匹配结果表 - 存储 AI 匹配评分
+model MatchingResult {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  userId        String   @map("user_id")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  score         Int      // 匹配分数 0-100
+  reason        String?  // 匹配理由
+  status        String   @default("pending")  // "pending", "interested", "contacted"
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@unique([projectId, userId])
+  @@map("matching_results")
+}
+
+// 服务商表
+model ServiceProvider {
+  id            String   @id @default(cuid())
+  name          String
+  category      String   // "investor", "incubator", "community", "cafe", etc.
+  description   String?
+  services      String?  // 提供的服务
+  city          String?
+  contact       String?  // 联系方式
+  contactPerson String?  @map("contact_person")
+  website       String?  // 外链
+  logo          String?
+  
+  approved      Boolean  @default(false)
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  @@map("service_providers")
+}
