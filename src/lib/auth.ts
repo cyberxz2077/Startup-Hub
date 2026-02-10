@@ -4,11 +4,13 @@
 
 import { cookies } from 'next/headers';
 
-const SECONDME_CLIENT_ID = process.env.SECONDME_CLIENT_ID!;
-const SECONDME_CLIENT_SECRET = process.env.SECONDME_CLIENT_SECRET!;
-const SECONDME_OAUTH_URL = process.env.SECONDME_OAUTH_URL!;
-const SECONDME_TOKEN_ENDPOINT = process.env.SECONDME_TOKEN_ENDPOINT!;
-const SECONDME_REDIRECT_URI = process.env.SECONDME_REDIRECT_URI!;
+const getAuthConfig = () => ({
+    clientId: process.env.SECONDME_CLIENT_ID || '',
+    clientSecret: process.env.SECONDME_CLIENT_SECRET || '',
+    oauthUrl: process.env.SECONDME_OAUTH_URL || '',
+    tokenEndpoint: process.env.SECONDME_TOKEN_ENDPOINT || '',
+    redirectUri: process.env.SECONDME_REDIRECT_URI || '',
+});
 
 export interface SecondMeTokens {
     accessToken: string;
@@ -20,22 +22,24 @@ export interface SecondMeTokens {
  * 生成 OAuth 授权 URL
  */
 export function generateAuthUrl(): string {
+    const config = getAuthConfig();
     const params = new URLSearchParams({
-        client_id: SECONDME_CLIENT_ID,
-        redirect_uri: SECONDME_REDIRECT_URI,
+        client_id: config.clientId,
+        redirect_uri: config.redirectUri,
         response_type: 'code',
         scope: 'user.info user.info.shades user.info.softmemory chat note.add',
         state: Math.random().toString(36).substring(7), // 简单的 state 生成
     });
 
-    return `${SECONDME_OAUTH_URL}?${params.toString()}`;
+    return `${config.oauthUrl}?${params.toString()}`;
 }
 
 /**
  * 用授权码换取 Access Token
  */
 export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
-    const response = await fetch(SECONDME_TOKEN_ENDPOINT, {
+    const config = getAuthConfig();
+    const response = await fetch(config.tokenEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -43,9 +47,9 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
         body: new URLSearchParams({
             grant_type: 'authorization_code',
             code,
-            client_id: SECONDME_CLIENT_ID,
-            client_secret: SECONDME_CLIENT_SECRET,
-            redirect_uri: SECONDME_REDIRECT_URI,
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
+            redirect_uri: config.redirectUri,
         }),
     });
 
@@ -70,7 +74,8 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
  * 刷新 Access Token
  */
 export async function refreshAccessToken(refreshToken: string): Promise<SecondMeTokens> {
-    const response = await fetch(SECONDME_TOKEN_ENDPOINT, {
+    const config = getAuthConfig();
+    const response = await fetch(config.tokenEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -78,8 +83,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<SecondMe
         body: new URLSearchParams({
             grant_type: 'refresh_token',
             refresh_token: refreshToken,
-            client_id: SECONDME_CLIENT_ID,
-            client_secret: SECONDME_CLIENT_SECRET,
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
         }),
     });
 

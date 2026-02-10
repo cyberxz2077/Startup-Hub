@@ -2,7 +2,7 @@
  * SecondMe API 客户端工具函数
  */
 
-const SECONDME_API_BASE_URL = process.env.SECONDME_API_BASE_URL!;
+const getApiBaseUrl = () => process.env.SECONDME_API_BASE_URL || '';
 
 export interface SecondMeUserInfo {
     user_id: string;
@@ -26,7 +26,7 @@ export interface ChatMessage {
  * 获取用户基础信息
  */
 export async function getUserInfo(accessToken: string): Promise<SecondMeUserInfo> {
-    const response = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/user/info`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/secondme/user/info`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
         },
@@ -49,7 +49,7 @@ export async function getUserInfo(accessToken: string): Promise<SecondMeUserInfo
  * 获取用户兴趣标签 (Shades)
  */
 export async function getUserShades(accessToken: string): Promise<SecondMeShade[]> {
-    const response = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/user/shades`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/secondme/user/shades`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
         },
@@ -72,7 +72,7 @@ export async function getUserShades(accessToken: string): Promise<SecondMeShade[
  * 获取用户软记忆
  */
 export async function getUserSoftMemory(accessToken: string): Promise<string> {
-    const response = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/user/softmemory`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/secondme/user/softmemory`, {
         headers: {
             'Authorization': `Bearer ${accessToken}`,
         },
@@ -100,7 +100,7 @@ export async function sendChatMessage(
     onChunk: (text: string) => void,
     onComplete: () => void
 ): Promise<void> {
-    const response = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/chat`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/secondme/chat`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -156,7 +156,7 @@ export async function sendChatMessage(
  * 添加笔记到 SecondMe
  */
 export async function addNote(accessToken: string, content: string): Promise<void> {
-    const response = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/note`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/secondme/note`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${accessToken}`,

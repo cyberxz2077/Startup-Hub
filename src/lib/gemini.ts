@@ -1,14 +1,15 @@
 import { GoogleGenAI } from '@google/genai';
 
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-if (!apiKey) {
-    throw new Error("Missing NEXT_PUBLIC_GEMINI_API_KEY");
-}
-
-const genAI = new GoogleGenAI({ apiKey });
+const getApiKey = () => {
+    return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.API_KEY;
+};
 
 export const getGeminiModel = () => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("Missing Gemini API Key. Please set NEXT_PUBLIC_GEMINI_API_KEY or API_KEY.");
+    }
+    const genAI = new GoogleGenAI({ apiKey });
     return genAI.chats.create({ model: "gemini-1.5-flash", config: { responseMimeType: "application/json" } });
 };
 
