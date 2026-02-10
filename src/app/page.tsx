@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Mail, Settings, UserCircle, Sparkles, ArrowRight } from 'lucide-react';
 import { ProjectShowcase } from '@/components/ProjectShowcase';
 import { ServiceShowcase } from '@/components/ServiceShowcase';
+import { Inbox } from '@/components/Inbox';
 import { RoleSelectionPage } from '@/components/RoleSelection';
 import { ProjectOnboarding } from '@/components/ProjectOnboarding';
 import { ProfileOnboarding } from '@/components/ProfileOnboarding';
@@ -49,7 +50,16 @@ const LandingPage = ({ onStartCreate, onViewProjects }: { onStartCreate: () => v
 };
 
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'landing' | 'role_selection' | 'project_create' | 'profile_create' | 'project_showcase' | 'service_showcase'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'role_selection' | 'project_create' | 'profile_create' | 'project_showcase' | 'service_showcase' | 'inbox'>('landing');
+
+  useEffect(() => {
+    // Basic dynamic view selection via URL hash or param
+    const params = new URLSearchParams(window.location.search);
+    const view = params.get('view');
+    if (view && ['landing', 'role_selection', 'project_create', 'profile_create', 'project_showcase', 'service_showcase', 'inbox'].includes(view)) {
+      setCurrentView(view as any);
+    }
+  }, []);
 
   // 处理注销
   const handleLogout = async () => {
@@ -74,7 +84,7 @@ export default function Home() {
           <div className="hidden md:flex items-center gap-8 text-sm font-sans font-medium text-ink-light">
             <button onClick={() => setCurrentView('project_showcase')} className="hover:text-ink transition-colors">Projects</button>
             <button onClick={() => setCurrentView('service_showcase')} className="hover:text-ink transition-colors">Services</button>
-            <button onClick={() => alert('Inbox coming soon in v0.6')} className="hover:text-ink transition-colors flex items-center gap-2"><Mail className="w-4 h-4" /> Inbox</button>
+            <button onClick={() => setCurrentView('inbox')} className="hover:text-ink transition-colors flex items-center gap-2"><Mail className="w-4 h-4" /> Inbox</button>
             <Link href="/dashboard" className="hover:text-ink transition-colors flex items-center gap-2"><UserCircle className="w-4 h-4" /> Me</Link>
             <button onClick={handleLogout} className="hover:text-ink transition-colors"><Settings className="w-4 h-4" /></button>
           </div>
@@ -93,6 +103,7 @@ export default function Home() {
         {currentView === 'profile_create' && <ProfileOnboarding onBack={() => setCurrentView('role_selection')} />}
         {currentView === 'project_showcase' && <ProjectShowcase onBack={() => setCurrentView('landing')} />}
         {currentView === 'service_showcase' && <ServiceShowcase onBack={() => setCurrentView('landing')} />}
+        {currentView === 'inbox' && <Inbox onBack={() => setCurrentView('landing')} />}
       </main>
     </div>
   );

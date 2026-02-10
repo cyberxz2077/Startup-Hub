@@ -18,24 +18,32 @@ interface MatchResult {
 export default function Dashboard() {
     const [matches, setMatches] = useState<MatchResult[]>([]);
     const [loading, setLoading] = useState(false);
-    const [userRole, setUserRole] = useState<'founder' | 'talent' | null>(null);
+    const [userProjects, setUserProjects] = useState<any[]>([]);
+    const [showProjectSelector, setShowProjectSelector] = useState(false);
 
-    const runMatch = async (type: 'project' | 'profile') => {
+    useEffect(() => {
+        // In a real app, we'd fetch projects owned by the user
+        // For now, let's fetch all and filter or just show all for demo
+        fetch('/api/projects')
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setUserProjects(data);
+                }
+            });
+    }, []);
+
+    const runMatch = async (type: 'project' | 'profile', targetId?: string) => {
         setLoading(true);
+        setShowProjectSelector(false);
         try {
-            // Ideally we get the user's project ID if they are a founder
-            // For MVP, we assume if they run match as 'profile', it uses their session profile
-            // If 'project', we need a project ID. Let's simplify:
-            // Talent -> Matches Projects
-            // Founder -> Matches Talents (requires picking a project first)
-
-            // Defaulting to 'profile' match for now (Talent looking for Projects)
-            // Or if we can detect they have a project...
-
             const res = await fetch('/api/match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: type, id: 'current' }), // 'id' handling needs refinement in API or here
+                body: JSON.stringify({
+                    type: type,
+                    id: type === 'project' ? targetId : 'current'
+                }),
             });
             const data = await res.json();
             if (data.success) {
@@ -63,7 +71,7 @@ export default function Dashboard() {
                     </h2>
                     <p className="text-ink-light mb-6">Find the perfect match for your vision or skills.</p>
 
-                    <div className="flex gap-4">
+                    <div className="flex flex-col md:flex-row gap-4">
                         <button
                             onClick={() => runMatch('profile')}
                             disabled={loading}
@@ -75,15 +83,37 @@ export default function Dashboard() {
                         </button>
 
                         <button
-                            onClick={() => alert("Founder matching flow involves selecting a specific project first. Coming soon!")}
+                            onClick={() => setShowProjectSelector(!showProjectSelector)}
                             disabled={loading}
-                            className="flex-1 py-4 border border-border rounded-lg hover:border-accent-red hover:text-accent-red transition-all flex flex-col items-center gap-2 group opacity-60"
+                            className={`flex-1 py-4 border rounded-lg transition-all flex flex-col items-center gap-2 group ${showProjectSelector ? 'border-accent-red text-accent-red bg-red-50' : 'border-border hover:border-accent-red hover:text-accent-red'}`}
                         >
                             <User className="w-6 h-6 text-gray-400 group-hover:text-accent-red" />
                             <span className="font-bold">Find Talent</span>
                             <span className="text-xs text-gray-400">Match candidates to my project</span>
                         </button>
                     </div>
+
+                    {showProjectSelector && (
+                        <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 animate-in fade-in slide-in-from-top-2">
+                            <h4 className="text-sm font-bold text-ink mb-3">Select a project to match for:</h4>
+                            {userProjects.length === 0 ? (
+                                <p className="text-xs text-ink-light italic">No projects found. Create one first!</p>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {userProjects.map(p => (
+                                        <button
+                                            key={p.id}
+                                            onClick={() => runMatch('project', p.id)}
+                                            className="text-left px-3 py-2 bg-white border border-border rounded hover:border-accent-red hover:bg-red-50 transition-colors text-sm"
+                                        >
+                                            <div className="font-bold truncate">{p.name}</div>
+                                            <div className="text-[10px] text-ink-light">{p.sector}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {loading && (
@@ -95,32 +125,67 @@ export default function Dashboard() {
 
                 {matches.length > 0 && (
                     <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                        <h3 className="font-bold text-ink-light uppercase tracking-widest text-xs">Top Matches</h3>
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-ink-light uppercase tracking-widest text-xs">Top Matches</h3>
+                            <button onClick={() => setMatches([])} className="text-[10px] text-ink-light hover:text-ink">Clear</button>
+                        </div>
                         {matches.map((match, idx) => (
-                            <div key={idx} className="bg-white p-6 rounded-xl border border-border shadow-sm flex gap-4 items-start">
+                            <div key={idx} className="bg-white p-6 rounded-xl border border-border shadow-sm flex gap-4 items-start hover:shadow-md transition-shadow">
                                 <div className="w-16 h-16 bg-green-50 rounded-full flex flex-col items-center justify-center text-green-700 font-bold border border-green-100 flex-shrink-0">
                                     <span className="text-xl">{match.score}</span>
                                     <span className="text-[10px] uppercase">Match</span>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <h4 className="text-xl font-serif font-bold text-ink mb-1">{match.name}</h4>
                                     <div className="text-xs text-ink-light mb-2 font-bold px-2 py-0.5 bg-gray-100 inline-block rounded">{match.sector || match.title}</div>
                                     <p className="text-sm text-ink/80 leading-relaxed mb-3">{match.reason}</p>
 
-                                    <div className="flex gap-4 text-xs">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         {match.pros?.length > 0 && (
-                                            <div className="text-green-700">
-                                                <span className="font-bold">✓ Pros:</span> {match.pros.slice(0, 2).join(", ")}
+                                            <div className="text-xs">
+                                                <span className="font-bold text-green-700 block mb-1 uppercase tracking-tighter">✓ Pros</span>
+                                                <ul className="list-disc list-inside text-ink-light">
+                                                    {match.pros.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {match.cons?.length > 0 && (
+                                            <div className="text-xs">
+                                                <span className="font-bold text-red-700 block mb-1 uppercase tracking-tighter">⚠ Considerations</span>
+                                                <ul className="list-disc list-inside text-ink-light">
+                                                    {match.cons.slice(0, 3).map((p, i) => <li key={i}>{p}</li>)}
+                                                </ul>
                                             </div>
                                         )}
                                     </div>
+
+                                    <button
+                                        onClick={async () => {
+                                            const res = await fetch('/api/inbox', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    targetId: match.targetId,
+                                                    targetType: match.sector ? 'project' : 'user',
+                                                    content: `Hi ${match.name}, I am interested in connecting based on our AI match score of ${match.score}%!`
+                                                })
+                                            });
+                                            if (res.ok) {
+                                                alert("Message initialized! Check your Inbox on the Home page.");
+                                            }
+                                        }}
+                                        className="mt-4 px-4 py-2 bg-ink text-white text-xs rounded hover:bg-ink-light transition-colors"
+                                    >
+                                        Send Message
+                                    </button>
                                 </div>
                             </div>
                         ))}
                     </div>
                 )}
-
             </div>
         </div>
     );
 }
+
+
