@@ -4,12 +4,26 @@
 
 import { cookies } from 'next/headers';
 
+const validateUrl = (url: string | undefined, name: string) => {
+    if (!url) return '';
+    if (!url.startsWith('http')) {
+        console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
+        return '';
+    }
+    // Prevent common mistake where variable name is entered as value
+    if (url === name) {
+        console.warn(`Environment variable ${name} has its own name as value! Check Vercel settings.`);
+        return '';
+    }
+    return url;
+};
+
 const getAuthConfig = () => ({
     clientId: process.env.SECONDME_CLIENT_ID || '',
     clientSecret: process.env.SECONDME_CLIENT_SECRET || '',
-    oauthUrl: process.env.SECONDME_OAUTH_URL || '',
-    tokenEndpoint: process.env.SECONDME_TOKEN_ENDPOINT || '',
-    redirectUri: process.env.SECONDME_REDIRECT_URI || '',
+    oauthUrl: validateUrl(process.env.SECONDME_OAUTH_URL, 'SECONDME_OAUTH_URL'),
+    tokenEndpoint: validateUrl(process.env.SECONDME_TOKEN_ENDPOINT, 'SECONDME_TOKEN_ENDPOINT'),
+    redirectUri: validateUrl(process.env.SECONDME_REDIRECT_URI, 'SECONDME_REDIRECT_URI'),
 });
 
 export interface SecondMeTokens {

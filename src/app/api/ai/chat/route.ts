@@ -10,11 +10,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Gemini API Key missing on server' }, { status: 500 });
         }
 
-        const genAI = new GoogleGenAI({ apiKey });
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',
+        const genAI = new GoogleGenAI(apiKey);
+        // Using any to bypass local environment type mismatches
+        const model = (genAI as any).getGenerativeModel({
+            model: "gemini-1.5-flash",
             systemInstruction: systemInstruction
         });
+
+        console.log(`Processing AI chat request: ${messages.length} messages, attachment: ${!!attachment}`);
 
         // Prepare history for chat - convert to Gemini format
         const history = messages.slice(0, -1).map((msg: any) => ({
@@ -46,8 +49,19 @@ export async function POST(req: NextRequest) {
 
         const result = await chat.sendMessage(content);
         const responseText = result.response.text();
+        console.log('Gemini raw response:', responseText);
 
-        return NextResponse.json(JSON.parse(responseText));
+        try {
+            // Clean markdown if AI wrapped it
+            const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
+            return NextResponse.json(JSON.parse(cleanJson));
+        } catch (parseError) {
+            console.error('JSON Parse Error from Gemini:', parseError, 'Raw text:', responseText);
+            return NextResponse.json({
+                reply: "抱歉，我的思考模块产生了一些格式错误。不过我已经理解了你的意图，我们可以换种方式继续或者请你再说一遍。",
+                updates: {}
+            });
+        }
     } catch (error: any) {
         console.error('AI Chat Route Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
