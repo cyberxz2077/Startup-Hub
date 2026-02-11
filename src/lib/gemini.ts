@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const getApiKey = () => {
     return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.API_KEY;
@@ -9,8 +9,8 @@ export const getGeminiModel = () => {
     if (!apiKey) {
         throw new Error("Missing Gemini API Key. Please set NEXT_PUBLIC_GEMINI_API_KEY or API_KEY.");
     }
-    const genAI = new GoogleGenAI({ apiKey });
-    return genAI.chats.create({ model: "gemini-1.5-flash", config: { responseMimeType: "application/json" } });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model: "gemini-1.5-flash", generationConfig: { responseMimeType: "application/json" } });
 };
 
 export const generateMatchScore = async (source: string, target: string, type: 'talent_to_project' | 'project_to_talent') => {
@@ -42,8 +42,8 @@ export const generateMatchScore = async (source: string, target: string, type: '
     `;
 
     try {
-        const result = await chat.sendMessage({ message: prompt });
-        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        const result = await chat.generateContent(prompt);
+        const text = result.response.text();
         if (!text) {
             console.error("Gemini Match Error: No text in response");
             return { score: 0, reason: "Analysis failed - No response", pros: [], cons: [] };
