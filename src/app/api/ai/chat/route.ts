@@ -10,12 +10,20 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Gemini API Key missing on server' }, { status: 500 });
         }
 
-        const genAI = new GoogleGenAI(apiKey);
-        // Using any to bypass local environment type mismatches
-        const model = (genAI as any).getGenerativeModel({
-            model: "gemini-1.5-flash",
-            systemInstruction: systemInstruction
-        });
+        // For version ^1.38.0, often it should be an object
+        console.log(`Initializing Gemini with key prefix: ${apiKey.substring(0, 6)}...`);
+
+        const genAI = new GoogleGenAI(apiKey); // Trying direct string first as it worked in some versions
+        let model: any;
+        try {
+            model = genAI.getGenerativeModel({
+                model: "gemini-1.5-flash",
+                systemInstruction: systemInstruction
+            });
+        } catch (e) {
+            console.error("Failed to init model with systemInstruction, trying fallback", e);
+            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        }
 
         console.log(`Processing AI chat request: ${messages.length} messages, attachment: ${!!attachment}`);
 

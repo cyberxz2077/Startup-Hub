@@ -51,6 +51,7 @@ const LandingPage = ({ onStartCreate, onViewProjects }: { onStartCreate: () => v
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<'landing' | 'role_selection' | 'project_create' | 'profile_create' | 'project_showcase' | 'service_showcase' | 'inbox'>('landing');
+  const [currentUser, setCurrentUser] = useState<{ name: string, avatar?: string } | null>(null);
 
   useEffect(() => {
     // Basic dynamic view selection via URL hash or param
@@ -59,6 +60,20 @@ export default function Home() {
     if (view && ['landing', 'role_selection', 'project_create', 'profile_create', 'project_showcase', 'service_showcase', 'inbox'].includes(view)) {
       setCurrentView(view as any);
     }
+
+    // Fetch user info to sync UI
+    const fetchUser = async () => {
+      try {
+        const res = await fetch('/api/profiles');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.name) setCurrentUser({ name: data.name, avatar: data.avatar });
+        }
+      } catch (e) {
+        console.error("Failed to sync user session", e);
+      }
+    };
+    fetchUser();
   }, []);
 
   // 处理注销
@@ -81,12 +96,25 @@ export default function Home() {
         </div>
 
         {currentView === 'landing' ? (
-          <div className="hidden md:flex items-center gap-8 text-sm font-sans font-medium text-ink-light">
+          <div className="hidden md:flex items-center gap-6 text-sm font-sans font-medium text-ink-light">
             <button onClick={() => setCurrentView('project_showcase')} className="hover:text-ink transition-colors">Projects</button>
             <button onClick={() => setCurrentView('service_showcase')} className="hover:text-ink transition-colors">Services</button>
             <button onClick={() => setCurrentView('inbox')} className="hover:text-ink transition-colors flex items-center gap-2"><Mail className="w-4 h-4" /> Inbox</button>
-            <Link href="/dashboard" className="hover:text-ink transition-colors flex items-center gap-2"><UserCircle className="w-4 h-4" /> Me</Link>
-            <button onClick={handleLogout} className="hover:text-ink transition-colors"><Settings className="w-4 h-4" /></button>
+
+            <div className="h-4 w-px bg-border mx-2"></div>
+
+            <Link href="/dashboard" className="hover:text-ink transition-all flex items-center gap-2 py-1 px-3 rounded-full hover:bg-ink/5 border border-transparent hover:border-border group">
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+              ) : (
+                <UserCircle className="w-5 h-5 group-hover:text-ink" />
+              )}
+              <span className="font-bold text-ink">{currentUser?.name || 'Me'}</span>
+            </Link>
+
+            <button onClick={handleLogout} className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink-light hover:text-ink" title="Logout">
+              <Settings className="w-4 h-4" />
+            </button>
           </div>
         ) : (
           <div className="text-xs font-sans text-ink-light flex items-center gap-2">
