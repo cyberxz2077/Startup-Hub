@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { LayoutGrid, Edit3, Check, X, Camera, Sparkles, Move, ZoomIn, ZoomOut } from 'lucide-react';
 import { ProfileData, Message, Attachment, Annotation, initialProfileData } from '@/types';
-import { GoogleGenAI } from '@google/genai';
 import { AIChat } from './AIChat';
 import { HighlightableText } from './ui/HighlightableText';
 import { AnnotationBubble } from './ui/AnnotationBubble';
@@ -40,7 +39,6 @@ const PublishModal = ({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean
 export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
     const [data, setData] = useState<ProfileData>(initialProfileData);
     const [messages, setMessages] = useState<Message[]>([{ role: 'model', text: "你好！我是你的职业经纪人。请告诉我你的职业背景、核心技能以及你正在寻找什么样的机会。如果有简历（PDF），请直接上传，我会帮你提取亮点。" }]);
-    const [chatSession, setChatSession] = useState<any>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [selection, setSelection] = useState<{ field: string, text: string, rect: DOMRect } | null>(null);
     const [loading, setLoading] = useState(false);
@@ -50,50 +48,48 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
     const avatarInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const init = async () => {
-            const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-
-            // Fetch existing profile data
+        const fetchProfile = async () => {
             try {
                 const res = await fetch('/api/profiles');
                 if (res.ok) {
                     const profileData = await res.json();
-                    // Merge with initial data to ensure all fields exist
                     setData(prev => ({ ...prev, ...profileData }));
-
-                    // Add a welcome message recognizing the user
                     if (profileData.name) {
-                        setMessages(prev => [{ role: 'model', text: `Welcome back, ${profileData.name}! I've loaded your profile. How can we improve it today?` }]);
-                        return; // Skip default welcome
+                        setMessages([{ role: 'model', text: `Welcome back, ${profileData.name}! I've loaded your profile. How can we improve it today?` }]);
                     }
                 }
             } catch (e) {
                 console.error("Failed to fetch profile", e);
             }
-
-            if (!apiKey) {
-                console.error("Gemini API Key missing");
-                return;
-            }
-            const ai = new GoogleGenAI({ apiKey });
-            // 使用 gemini-1.5-flash 模型
-            setChatSession(ai.chats.create({ model: 'gemini-1.5-flash', config: { systemInstruction: PROFILE_SYSTEM_INSTRUCTION, responseMimeType: "application/json" } }));
         };
-        init();
+        fetchProfile();
     }, []);
 
     const handleMsg = async (text: string, att?: Attachment | null) => {
-        if (!chatSession) return;
         const userMsg: Message = { role: 'user', text: att ? `[Resume: ${att.name}] ${text}` : text };
-        setMessages(prev => [...prev, userMsg]);
+        const newMessages = [...messages, userMsg];
+        setMessages(newMessages);
         setLoading(true);
         try {
-            const content = att ? [{ text }, { inlineData: { mimeType: att.mimeType, data: att.data } }] : text;
-            const res = await chatSession.sendMessage({ message: content });
-            const json = JSON.parse(res.text());
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: newMessages,
+                    systemInstruction: PROFILE_SYSTEM_INSTRUCTION,
+                    attachment: att
+                }),
+            });
+
+            if (!res.ok) throw new Error('AI response failed');
+
+            const json = await res.json();
             setMessages(prev => [...prev, { role: 'model', text: json.reply }]);
             if (json.updates) setData(prev => ({ ...prev, ...json.updates }));
-        } catch (e) { console.error(e); } finally {
+        } catch (e) {
+            console.error(e);
+            setMessages(prev => [...prev, { role: 'model', text: "抱歉，AI 助手暂时无法响应。请检查网络连接或稍后再试。" }]);
+        } finally {
             setLoading(false);
         }
     };

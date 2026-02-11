@@ -15,8 +15,12 @@ export async function GET() {
         }
 
         return NextResponse.redirect(authUrl);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Login Route Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message,
+            stack: error.stack
+        }, { status: 500 });
     }
 }

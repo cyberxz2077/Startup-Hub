@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LayoutGrid, Edit3, Check, X, Upload } from 'lucide-react';
 import { ProjectData, Message, Attachment, Annotation, initialProjectData } from '@/types';
-import { GoogleGenAI } from '@google/genai';
 import { AIChat } from './AIChat';
 import { ProjectArtifact } from './ProjectArtifact';
 import { AnnotationBubble } from './ui/AnnotationBubble';
@@ -61,39 +60,37 @@ const PublishModal = ({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean
 export const ProjectOnboarding = ({ onBack }: { onBack: () => void }) => {
     const [data, setData] = useState<ProjectData>(initialProjectData);
     const [messages, setMessages] = useState<Message[]>([{ role: 'model', text: "你好！我是你的 AI 联合创始人助手。为了高效帮你生成项目档案，请告诉我你的项目名称、愿景和目前遇到的核心问题，或者直接上传 BP。" }]);
-    const [chatSession, setChatSession] = useState<any>(null);
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [selection, setSelection] = useState<{ field: string, text: string, rect: DOMRect } | null>(null);
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    useEffect(() => {
-        const init = async () => {
-            const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-            if (!apiKey) {
-                console.error("Gemini API Key missing");
-                return;
-            }
-            const ai = new GoogleGenAI({ apiKey });
-            // 使用 gemini-1.5-flash 模型
-            setChatSession(ai.chats.create({ model: 'gemini-1.5-flash', config: { systemInstruction: PROJECT_SYSTEM_INSTRUCTION, responseMimeType: "application/json" } }));
-        };
-        init();
-    }, []);
-
     const handleMsg = async (text: string, att?: Attachment | null) => {
-        if (!chatSession) return;
         const userMsg: Message = { role: 'user', text: att ? `[File: ${att.name}] ${text}` : text };
-        setMessages(prev => [...prev, userMsg]);
+        const newMessages = [...messages, userMsg];
+        setMessages(newMessages);
         setLoading(true);
         try {
-            const content = att ? [{ text }, { inlineData: { mimeType: att.mimeType, data: att.data } }] : text;
-            const res = await chatSession.sendMessage({ message: content });
-            const json = JSON.parse(res.text());
+            const res = await fetch('/api/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    messages: newMessages,
+                    systemInstruction: PROJECT_SYSTEM_INSTRUCTION,
+                    attachment: att
+                }),
+            });
+
+            if (!res.ok) throw new Error('AI response failed');
+
+            const json = await res.json();
             setMessages(prev => [...prev, { role: 'model', text: json.reply }]);
             if (json.updates) setData(prev => ({ ...prev, ...json.updates }));
-        } catch (e) { console.error(e); } finally {
+        } catch (e) {
+            console.error(e);
+            setMessages(prev => [...prev, { role: 'model', text: "抱歉，AI 助手暂时无法响应。请检查网络连接或稍后再试。" }]);
+        } finally {
             setLoading(false);
         }
     };
