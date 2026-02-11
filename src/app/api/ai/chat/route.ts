@@ -1,27 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export async function POST(req: NextRequest) {
     try {
         const { messages, systemInstruction, attachment } = await req.json();
 
+        // 优先使用 Vercel 环境变量，本地使用 .env
         const apiKey = process.env.API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
         if (!apiKey) {
-            console.error('SERVER ERROR: Gemini API Key missing in environment.');
+            console.error('[AI Proxy] Server Error: Gemini API Key missing.');
             return NextResponse.json({ error: 'Gemini API Key missing on server' }, { status: 500 });
         }
 
-        // Initialize SDK with string only to avoid version-specific object mismatches
-        const genAI = new GoogleGenAI(apiKey);
+        console.log(`[AI Proxy] Initializing GoogleGenerativeAI with key prefix: ${apiKey.substring(0, 5)}...`);
 
-        // Use any to bypass all runtime property checks while keeping functionality
-        const model: any = (genAI as any).getGenerativeModel({
+        // 使用标准 SDK 初始化
+        const genAI = new GoogleGenerativeAI(apiKey);
+
+        // 获取模型实例，并传入系统指令（如果SDK支持）
+        // 注意：标准 SDK 在 getGenerativeModel 中支持 systemInstruction
+        const model = genAI.getGenerativeModel({
             model: "gemini-1.5-flash",
             systemInstruction: systemInstruction
         });
 
-        console.log(`[AI Chat] Processing ${messages.length} messages. Attachment: ${!!attachment}`);
+        console.log(`[AI Proxy] Processing ${messages.length} messages. Has Attachment: ${!!attachment}`);
 
+        // 转换消息历史格式为 SDK 所需格式
+        // SDK 格式: { role: 'user' | 'model', parts: [{ text: string }] }
+        // 前端格式: { role: 'user' | 'model', text: string }
         const history = messages.slice(0, -1).map((msg: any) => ({
             role: msg.role === 'model' ? 'model' : 'user',
             parts: [{ text: msg.text }]
@@ -30,6 +38,7 @@ export async function POST(req: NextRequest) {
         const chat = model.startChat({
             history: history,
             generationConfig: {
+                // 确保模型输出 JSON，以便前端解析
                 responseMimeType: 'application/json',
             },
         });
@@ -37,9 +46,10 @@ export async function POST(req: NextRequest) {
         const currentMsg = messages[messages.length - 1];
         let content: any = currentMsg.text;
 
+        // 处理附件
         if (attachment) {
             content = [
-                { text: currentMsg.text || "Please analyze this attachment." },
+                { text: currentMsg.text || "Please analyze this attachment based on the context." },
                 {
                     inlineData: {
                         mimeType: attachment.mimeType,
@@ -51,24 +61,28 @@ export async function POST(req: NextRequest) {
 
         const result = await chat.sendMessage(content);
         const responseText = result.response.text();
-        console.log('[AI Chat] Raw response received.');
+        console.log('[AI Proxy] Response received. Length:', responseText.length);
 
         try {
-            // Robust JSON cleaning
+            // 清理可能存在的 Markdown 代码块标记
             const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
             return NextResponse.json(JSON.parse(cleanJson));
         } catch (parseError) {
-            console.error('[AI Chat] JSON Parse Error:', parseError, 'Raw text:', responseText);
+            console.error('[AI Proxy] JSON Parse Error:', parseError);
+            console.error('[AI Proxy] Raw Response:', responseText);
+
+            // 返回一个友好的错误提示，而不是 500
             return NextResponse.json({
-                reply: "抱歉，我的思考模块产生了一些格式错误。不过我已经理解了你的意图，我们可以换种方式继续或者请你再说一遍。",
+                reply: "抱歉，由于模型输出格式异常，我暂时无法处理。请稍后再试或换个说法。",
                 updates: {}
             });
         }
     } catch (error: any) {
-        console.error('[AI Chat] Route Error:', error);
+        console.error('[AI Proxy] Critical Error:', error);
         return NextResponse.json({
-            error: "服务端请求 AI 失败",
-            details: error.message
+            error: "AI 服务暂时不可用",
+            details: error.message,
+            stack: error.stack
         }, { status: 500 });
     }
 }
