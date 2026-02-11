@@ -53,6 +53,8 @@ export function generateAuthUrl(): string {
  */
 export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
+    console.log('Exchanging code for tokens at:', config.tokenEndpoint);
+
     const response = await fetch(config.tokenEndpoint, {
         method: 'POST',
         headers: {
@@ -68,18 +70,29 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
     });
 
     if (!response.ok) {
-        throw new Error(`Token exchange failed: ${response.statusText}`);
+        const errText = await response.text();
+        console.error('Token exchange failed:', response.status, errText);
+        throw new Error(`Token exchange failed: ${response.status} ${errText}`);
     }
 
-    const data = await response.json();
+    const json = await response.json();
+    console.log('Token response:', JSON.stringify(json));
 
-    // 计算过期时间
+    // Handle SecondMe { code: 0, data: { ... } } structure
+    const tokenData = json.data || json;
+    const accessToken = tokenData.accessToken || tokenData.access_token;
+    const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
+
+    if (!accessToken) {
+        throw new Error(`No access token received: ${JSON.stringify(json)}`);
+    }
+
     const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (data.expires_in || 7200));
+    expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
 
     return {
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
+        accessToken,
+        refreshToken: refreshToken || '',
         expiresAt,
     };
 }
@@ -103,17 +116,21 @@ export async function refreshAccessToken(refreshToken: string): Promise<SecondMe
     });
 
     if (!response.ok) {
-        throw new Error(`Token refresh failed: ${response.statusText}`);
+        const errText = await response.text();
+        throw new Error(`Token refresh failed: ${response.status} ${errText}`);
     }
 
-    const data = await response.json();
+    const json = await response.json();
+    const tokenData = json.data || json;
+    const accessToken = tokenData.accessToken || tokenData.access_token;
+    const newRefreshToken = tokenData.refreshToken || tokenData.refresh_token || refreshToken;
 
     const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (data.expires_in || 7200));
+    expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
 
     return {
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token,
+        accessToken,
+        refreshToken: newRefreshToken,
         expiresAt,
     };
 }

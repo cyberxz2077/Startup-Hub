@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
         const tokens = await exchangeCodeForTokens(code);
 
         // 2. 获取用户信息
+        console.log('Fetching user info for token:', tokens.accessToken.substring(0, 10) + '...');
         const userInfoResponse = await fetch(`${SECONDME_API_BASE_URL}/api/secondme/user/info`, {
             headers: {
                 'Authorization': `Bearer ${tokens.accessToken}`,
@@ -33,16 +34,19 @@ export async function GET(request: NextRequest) {
         });
 
         if (!userInfoResponse.ok) {
-            throw new Error('Failed to fetch user info');
+            const errBody = await userInfoResponse.text();
+            console.error('Failed to fetch user info:', userInfoResponse.status, errBody);
+            throw new Error(`Failed to fetch user info: ${userInfoResponse.status} ${errBody}`);
         }
 
         const userInfoData = await userInfoResponse.json();
+        console.log('User info raw response:', JSON.stringify(userInfoData));
 
         if (userInfoData.code !== 0) {
-            throw new Error('Invalid user info response');
+            throw new Error(`Invalid user info response: ${JSON.stringify(userInfoData)}`);
         }
 
-        const userInfo = userInfoData.data;
+        const userInfo = userInfoData.data || userInfoData;
 
         // 3. 创建或更新用户
         const prisma = new PrismaClient();
