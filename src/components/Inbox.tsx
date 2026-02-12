@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Send, User, ChevronLeft } from 'lucide-react';
+import { Send, User, ChevronLeft, Briefcase, Building2 } from 'lucide-react';
 
 interface Message {
     id: string;
@@ -17,6 +17,13 @@ interface ChatSession {
     messages: Message[];
     updatedAt: string;
 }
+
+const getTargetInfo = (session: ChatSession) => {
+    const nameMatch = session.targetId.match(/test_((.+))/);
+    const name = nameMatch ? nameMatch[1].replace(/_/g, ' ') : session.targetId;
+    const type = session.targetType;
+    return { name, type };
+};
 
 export const Inbox = ({ onBack }: { onBack: () => void }) => {
     const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -49,7 +56,6 @@ export const Inbox = ({ onBack }: { onBack: () => void }) => {
 
             if (res.ok) {
                 const data = await res.json();
-                // Update local UI
                 const updatedMsg: Message = data.message;
                 setSelectedSession({
                     ...selectedSession,
@@ -74,38 +80,46 @@ export const Inbox = ({ onBack }: { onBack: () => void }) => {
             </div>
 
             <div className="flex-1 flex overflow-hidden">
-                {/* Session List */}
                 <div className={`w-full md:w-80 border-r border-border bg-white overflow-y-auto ${selectedSession ? 'hidden md:block' : 'block'}`}>
                     {sessions.length === 0 ? (
                         <div className="p-8 text-center text-gray-400 text-sm">No messages yet.</div>
                     ) : (
-                        sessions.map(s => (
-                            <div
-                                key={s.id}
-                                onClick={() => setSelectedSession(s)}
-                                className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedSession?.id === s.id ? 'bg-accent-blue/5 border-l-4 border-l-accent-blue' : ''}`}
-                            >
-                                <div className="flex items-center gap-3 mb-1">
-                                    <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                                        <User className="w-5 h-5 text-gray-400" />
+                        sessions.map(s => {
+                            const info = getTargetInfo(s);
+                            return (
+                                <div
+                                    key={s.id}
+                                    onClick={() => setSelectedSession(s)}
+                                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${selectedSession?.id === s.id ? 'bg-accent-blue/5 border-l-4 border-l-accent-blue' : ''}`}
+                                >
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                            {info.type === 'project' ? (
+                                                <Briefcase className="w-5 h-5 text-accent-blue" />
+                                            ) : (
+                                                <Building2 className="w-5 h-5 text-ink-light" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-bold text-sm truncate text-ink">{info.name}</div>
+                                            <div className="text-[10px] text-gray-400 uppercase tracking-tighter">{info.type}</div>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="font-bold text-sm truncate">Session with {s.targetType}</div>
-                                        <div className="text-[10px] text-gray-400 uppercase tracking-tighter">ID: {s.targetId.slice(0, 8)}</div>
+                                    <div className="text-xs text-ink-light truncate pl-13 mt-1">
+                                        {s.messages[0]?.content || "No messages"}
                                     </div>
                                 </div>
-                                <div className="text-xs text-ink-light truncate pl-13">
-                                    {s.messages[0]?.content || "No messages"}
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
 
-                {/* Chat Area */}
                 <div className={`flex-1 flex flex-col bg-white/50 ${!selectedSession ? 'hidden md:flex items-center justify-center text-gray-400 italic' : 'flex'}`}>
                     {!selectedSession ? (
-                        "Select a conversation to start chatting"
+                        <div className="text-center">
+                            <User className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                            <p>Select a conversation to start chatting</p>
+                        </div>
                     ) : (
                         <>
                             <div className="flex-1 overflow-y-auto p-4 flex flex-col-reverse gap-4">

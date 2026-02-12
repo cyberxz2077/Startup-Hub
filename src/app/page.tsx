@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Mail, Settings, UserCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { Mail, Settings, UserCircle, Sparkles, ArrowRight, Briefcase, Building2 } from 'lucide-react';
 import { ProjectShowcase } from '@/components/ProjectShowcase';
 import { ServiceShowcase } from '@/components/ServiceShowcase';
 import { Inbox } from '@/components/Inbox';
@@ -56,14 +56,12 @@ export default function Home() {
   const [currentUser, setCurrentUser] = useState<{ name: string, avatar?: string } | null>(null);
 
   useEffect(() => {
-    // Basic dynamic view selection via URL hash or param
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view && ['landing', 'role_selection', 'project_create', 'profile_create', 'project_showcase', 'service_showcase', 'inbox'].includes(view)) {
       setCurrentView(view as ViewType);
     }
 
-    // Fetch user info to sync UI
     const fetchUser = async () => {
       try {
         const res = await fetch('/api/profiles');
@@ -78,52 +76,73 @@ export default function Home() {
     fetchUser();
   }, []);
 
-  // 处理注销
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      // 可以在这里重新加载页面或清除状态
       window.location.reload();
     } catch (error) {
       console.error('Logout failed', error);
     }
   };
 
+  const isActive = (view: ViewType) => currentView === view;
+
   return (
     <div className="h-screen flex flex-col bg-paper-texture text-ink selection:bg-accent-red/20 overflow-hidden">
       <nav className="h-16 border-b border-border bg-paper/90 backdrop-blur z-50 flex-none flex items-center justify-between px-6 transition-all">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('landing')}>
           <div className="w-8 h-8 bg-ink text-white flex items-center justify-center font-serif font-bold text-xl rounded-sm">H</div>
-          <span className="font-serif font-bold text-lg tracking-wide">Startup Hub <span className="text-[10px] bg-ink/10 px-1 rounded ml-1 text-ink-light align-top">v0.5</span></span>
+          <span className="font-serif font-bold text-lg tracking-wide hidden sm:inline">Startup Hub <span className="text-[10px] bg-ink/10 px-1 rounded ml-1 text-ink-light align-top">v0.5</span></span>
         </div>
 
-        {currentView === 'landing' ? (
-          <div className="hidden md:flex items-center gap-6 text-sm font-sans font-medium text-ink-light">
-            <button onClick={() => setCurrentView('project_showcase')} className="hover:text-ink transition-colors">Projects</button>
-            <button onClick={() => setCurrentView('service_showcase')} className="hover:text-ink transition-colors">Services</button>
-            <button onClick={() => setCurrentView('inbox')} className="hover:text-ink transition-colors flex items-center gap-2"><Mail className="w-4 h-4" /> Inbox</button>
+        <div className="flex items-center gap-2 md:gap-6 text-sm font-sans font-medium text-ink-light">
+          <button 
+            onClick={() => setCurrentView('project_showcase')} 
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors ${isActive('project_showcase') ? 'text-ink bg-ink/5' : 'hover:text-ink hover:bg-ink/5'}`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span className="hidden md:inline">Projects</span>
+          </button>
+          <button 
+            onClick={() => setCurrentView('service_showcase')} 
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors ${isActive('service_showcase') ? 'text-ink bg-ink/5' : 'hover:text-ink hover:bg-ink/5'}`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span className="hidden md:inline">Services</span>
+          </button>
+          <button 
+            onClick={() => setCurrentView('inbox')} 
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors ${isActive('inbox') ? 'text-ink bg-ink/5' : 'hover:text-ink hover:bg-ink/5'}`}
+          >
+            <Mail className="w-4 h-4" />
+            <span className="hidden md:inline">Inbox</span>
+          </button>
 
-            <div className="h-4 w-px bg-border mx-2"></div>
+          <div className="h-4 w-px bg-border mx-1 md:mx-2 hidden sm:block"></div>
 
-            <Link href="/dashboard" className="hover:text-ink transition-all flex items-center gap-2 py-1 px-3 rounded-full hover:bg-ink/5 border border-transparent hover:border-border group">
-              {currentUser?.avatar ? (
-                <img src={currentUser.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
-              ) : (
-                <UserCircle className="w-5 h-5 group-hover:text-ink" />
-              )}
-              <span className="font-bold text-ink">{currentUser?.name || 'Me'}</span>
-            </Link>
-
-            <button onClick={handleLogout} className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink-light hover:text-ink" title="Logout">
-              <Settings className="w-4 h-4" />
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <Link href="/dashboard" className="hover:text-ink transition-all flex items-center gap-2 py-1 px-2 md:px-3 rounded-full hover:bg-ink/5 border border-transparent hover:border-border group">
+                {currentUser.avatar ? (
+                  <img src={currentUser.avatar} alt="Avatar" className="w-6 h-6 rounded-full object-cover border border-border" />
+                ) : (
+                  <UserCircle className="w-5 h-5 group-hover:text-ink" />
+                )}
+                <span className="font-bold text-ink hidden sm:inline">{currentUser.name}</span>
+              </Link>
+              <button onClick={handleLogout} className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink-light hover:text-ink" title="Logout">
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setCurrentView('role_selection')} 
+              className="px-3 py-1.5 bg-ink text-white rounded-lg text-sm font-medium hover:bg-ink-light transition-colors"
+            >
+              Login
             </button>
-          </div>
-        ) : (
-          <div className="text-xs font-sans text-ink-light flex items-center gap-2">
-            <span className="hidden md:inline">{currentView === 'role_selection' ? 'Select Role' : 'Drafting Mode'}</span>
-            {currentView !== 'role_selection' && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>}
-          </div>
-        )}
+          )}
+        </div>
       </nav>
 
       <main className="flex-1 overflow-hidden relative">
