@@ -6,13 +6,11 @@ import { cookies } from 'next/headers';
 
 const validateUrl = (url: string | undefined, name: string) => {
     if (!url) return '';
-    // Remove backticks that might be in the environment variable
     url = url.replace(/`/g, '').trim();
     if (!url.startsWith('http')) {
         console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
         return '';
     }
-    // Prevent common mistake where variable name is entered as value
     if (url === name) {
         console.warn(`Environment variable ${name} has its own name as value! Check Vercel settings.`);
         return '';
@@ -34,9 +32,6 @@ export interface SecondMeTokens {
     expiresAt: Date;
 }
 
-/**
- * 生成 OAuth 授权 URL
- */
 export function generateAuthUrl(): string {
     const config = getAuthConfig();
     const params = new URLSearchParams({
@@ -50,59 +45,72 @@ export function generateAuthUrl(): string {
     return `${config.oauthUrl}?${params.toString()}`;
 }
 
-/**
- * 用授权码换取 Access Token
- */
 export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
     console.log('Exchanging code for tokens at:', config.tokenEndpoint);
     console.log('Using redirect_uri:', config.redirectUri);
 
-    const response = await fetch(config.tokenEndpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            grant_type: 'authorization_code',
-            code,
-            client_id: config.clientId,
-            client_secret: config.clientSecret,
-            redirect_uri: config.redirectUri,
-        }),
-    });
+    const tokenEndpoints = [
+        config.tokenEndpoint,
+        'https://app.mindos.com/gate/lab/oauth/token',
+        'https://app.mindos.com/oauth/token',
+        'https://app.mindos.com/gate/lab/api/oauth2/token',
+    ];
 
-    if (!response.ok) {
-        const errText = await response.text();
-        console.error('Token exchange failed:', response.status, errText);
-        throw new Error(`Token exchange failed: ${response.status} ${errText}`);
+    let lastError: Error | null = null;
+
+    for (const endpoint of tokenEndpoints) {
+        console.log(`Trying token endpoint: ${endpoint}`);
+        
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code,
+                    client_id: config.clientId,
+                    client_secret: config.clientSecret,
+                    redirect_uri: config.redirectUri,
+                }),
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+                console.log('Token response:', JSON.stringify(json));
+
+                const tokenData = json.data || json;
+                const accessToken = tokenData.accessToken || tokenData.access_token;
+                const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
+
+                if (!accessToken) {
+                    throw new Error(`No access token received: ${JSON.stringify(json)}`);
+                }
+
+                const expiresAt = new Date();
+                expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
+
+                return {
+                    accessToken,
+                    refreshToken: refreshToken || '',
+                    expiresAt,
+                };
+            } else {
+                const errText = await response.text();
+                lastError = new Error(`Token exchange failed: ${response.status} ${errText}`);
+                console.error(`Failed with endpoint ${endpoint}:`, response.status, errText);
+            }
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error));
+            console.error(`Error with endpoint ${endpoint}:`, error);
+        }
     }
 
-    const json = await response.json();
-    console.log('Token response:', JSON.stringify(json));
-
-    // Handle SecondMe { code: 0, data: { ... } } structure
-    const tokenData = json.data || json;
-    const accessToken = tokenData.accessToken || tokenData.access_token;
-    const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
-
-    if (!accessToken) {
-        throw new Error(`No access token received: ${JSON.stringify(json)}`);
-    }
-
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
-
-    return {
-        accessToken,
-        refreshToken: refreshToken || '',
-        expiresAt,
-    };
+    throw lastError || new Error('All token endpoints failed');
 }
 
-/**
- * 刷新 Access Token
- */
 export async function refreshAccessToken(refreshToken: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
     const response = await fetch(config.tokenEndpoint, {
@@ -138,9 +146,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<SecondMe
     };
 }
 
-/**
- * 获取当前登录用户 Session
- */
 export async function getSession() {
     const cookieStore = await cookies();
     const userId = cookieStore.get('user_id')?.value;
@@ -192,9 +197,6 @@ export async function getSession() {
     }
 }
 
-/**
- * 登出
- */
 export async function logout() {
     const cookieStore = await cookies();
     cookieStore.delete('user_id');
