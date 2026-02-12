@@ -6,6 +6,8 @@ import { cookies } from 'next/headers';
 
 const validateUrl = (url: string | undefined, name: string) => {
     if (!url) return '';
+    // Remove backticks that might be in the environment variable
+    url = url.replace(/`/g, '').trim();
     if (!url.startsWith('http')) {
         console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
         return '';
@@ -42,7 +44,7 @@ export function generateAuthUrl(): string {
         redirect_uri: config.redirectUri,
         response_type: 'code',
         scope: 'user.info user.info.shades user.info.softmemory chat note.add',
-        state: Math.random().toString(36).substring(7), // 简单的 state 生成
+        state: Math.random().toString(36).substring(7),
     });
 
     return `${config.oauthUrl}?${params.toString()}`;
@@ -54,6 +56,7 @@ export function generateAuthUrl(): string {
 export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
     console.log('Exchanging code for tokens at:', config.tokenEndpoint);
+    console.log('Using redirect_uri:', config.redirectUri);
 
     const response = await fetch(config.tokenEndpoint, {
         method: 'POST',
@@ -146,7 +149,6 @@ export async function getSession() {
         return null;
     }
 
-    // 从数据库获取用户信息
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
 
@@ -162,13 +164,10 @@ export async function getSession() {
             return null;
         }
 
-        // 检查 Token 是否过期
         if (new Date() > user.tokenExpiresAt) {
-            // Token 已过期,尝试刷新
             try {
                 const newTokens = await refreshAccessToken(user.refreshToken);
 
-                // 更新数据库中的 Token
                 await prisma.user.update({
                     where: { id: user.id },
                     data: {
