@@ -18,7 +18,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing type or id' }, { status: 400 });
         }
 
-        let matches = [];
+        const matches = [];
 
         if (type === 'project') {
             // Source is Project, find matching Talents

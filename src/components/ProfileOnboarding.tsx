@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Edit3, Check, X, Camera, Sparkles, Move, ZoomIn, ZoomOut } from 'lucide-react';
+import { LayoutGrid, Edit3, Check, X, Camera, Sparkles } from 'lucide-react';
 import { ProfileData, Message, Attachment, Annotation, initialProfileData } from '@/types';
 import { AIChat } from './AIChat';
 import { HighlightableText } from './ui/HighlightableText';

@@ -42,7 +42,7 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                                 <Briefcase className="w-8 h-8" />
                             </div>
                             <h3 className="text-2xl font-serif font-bold text-ink mb-2">I am a Founder</h3>
-                            <p className="text-ink-light text-sm leading-relaxed">I have a vision and I'm looking for builders to bring it to life. I need to recruit a team.</p>
+                            <p className="text-ink-light text-sm leading-relaxed">I have a vision and I&apos;m looking for builders to bring it to life. I need to recruit a team.</p>
                             <div className="mt-8 flex items-center text-sm font-bold uppercase tracking-wider text-accent-red opacity-0 group-hover:opacity-100 transition-opacity">
                                 Select <ArrowRight className="w-4 h-4 ml-2" />
                             </div>
@@ -53,7 +53,7 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                                 <User className="w-8 h-8" />
                             </div>
                             <h3 className="text-2xl font-serif font-bold text-ink mb-2">I am a Talent</h3>
-                            <p className="text-ink-light text-sm leading-relaxed">I have exceptional skills and I'm looking for a high-potential ship to board.</p>
+                            <p className="text-ink-light text-sm leading-relaxed">I have exceptional skills and I&apos;m looking for a high-potential ship to board.</p>
                             <div className="mt-8 flex items-center text-sm font-bold uppercase tracking-wider text-accent-blue opacity-0 group-hover:opacity-100 transition-opacity">
                                 Select <ArrowRight className="w-4 h-4 ml-2" />
                             </div>
@@ -82,7 +82,7 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                                     </div>
                                     <div className="text-left">
                                         <div className="font-bold text-ink">Create Project</div>
-                                        <div className="text-xs text-ink-light">Draft your venture's manifesto</div>
+                                        <div className="text-xs text-ink-light">Draft your venture&apos;s manifesto</div>
                                     </div>
                                     <ChevronRight className="w-4 h-4 ml-auto text-gray-300 group-hover:text-ink" />
                                 </button>

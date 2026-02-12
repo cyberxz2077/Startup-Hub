@@ -12,7 +12,7 @@ interface ServiceProvider {
     website: string;
 }
 
-export const ServiceShowcase = ({ onBack }: { onBack: () => void }) => {
+export const ServiceShowcase = ({ onBack: _onBack = () => {} }: { onBack?: () => void }) => {
     const [services, setServices] = useState<ServiceProvider[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');

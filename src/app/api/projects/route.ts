@@ -64,13 +64,13 @@ export async function GET() {
             include: { owner: { select: { name: true, avatar: true } } }
         });
 
-        const parsedProjects = projects.map((p: any) => ({
+        const parsedProjects = projects.map((p) => ({
             ...p,
             talentNeeds: p.talentNeeds || [],
         }));
 
         return NextResponse.json(parsedProjects);
-    } catch (error) {
+    } catch {
         return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });
     } finally {
         await prisma.$disconnect();

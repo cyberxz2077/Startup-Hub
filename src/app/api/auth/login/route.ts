@@ -15,12 +15,14 @@ export async function GET() {
         }
 
         return NextResponse.redirect(authUrl);
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Login Route Error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
         return NextResponse.json({
             error: 'Internal Server Error',
-            details: error.message,
-            stack: error.stack
+            details: errorMessage,
+            stack: errorStack
         }, { status: 500 });
     }
 }

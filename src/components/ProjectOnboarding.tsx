@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LayoutGrid, Edit3, Check, X, Upload } from 'lucide-react';
 import { ProjectData, Message, Attachment, Annotation, initialProjectData } from '@/types';
 import { AIChat } from './AIChat';

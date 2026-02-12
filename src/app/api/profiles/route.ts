@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
         const session = await getSession();
         if (!session) {
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
         const skills = Array.isArray(data.skills) ? data.skills : [];
 
         // Transaction to update User and Upsert Profile
-        await prisma.$transaction(async (tx: any) => {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             // 1. Update basic user info
             await tx.user.update({
                 where: { id: session.id },

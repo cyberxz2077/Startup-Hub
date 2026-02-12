@@ -28,7 +28,7 @@ export const HighlightableText = ({
         fieldAnnotations.sort((a, b) => text.indexOf(a.selectedText) - text.indexOf(b.selectedText));
         let lastIndex = 0;
         const elements: React.ReactNode[] = [];
-        fieldAnnotations.forEach((ann, idx) => {
+        fieldAnnotations.forEach((ann) => {
             const startIndex = text.indexOf(ann.selectedText, lastIndex);
             if (startIndex === -1) return;
             if (startIndex > lastIndex) elements.push(text.substring(lastIndex, startIndex));

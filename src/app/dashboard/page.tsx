@@ -1,14 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Briefcase, User, Star } from 'lucide-react';
+import { Sparkles, Briefcase, User } from 'lucide-react';
 import Link from 'next/link';
+
+interface Project {
+    id: string;
+    name: string;
+    sector?: string;
+}
 
 interface MatchResult {
     targetId: string;
     name: string;
-    title?: string; // for talent
-    sector?: string; // for project
+    title?: string;
+    sector?: string;
     score: number;
     reason: string;
     pros: string[];
@@ -18,7 +24,7 @@ interface MatchResult {
 export default function Dashboard() {
     const [matches, setMatches] = useState<MatchResult[]>([]);
     const [loading, setLoading] = useState(false);
-    const [userProjects, setUserProjects] = useState<any[]>([]);
+    const [userProjects, setUserProjects] = useState<Project[]>([]);
     const [showProjectSelector, setShowProjectSelector] = useState(false);
 
     useEffect(() => {

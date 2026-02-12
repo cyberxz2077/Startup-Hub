@@ -8,7 +8,7 @@ interface ProjectWithMeta extends ProjectData {
     createdAt: string;
 }
 
-export const ProjectShowcase = ({ onBack }: { onBack: () => void }) => {
+export const ProjectShowcase = ({ onBack: _onBack = () => {} }: { onBack?: () => void }) => {
     const [projects, setProjects] = useState<ProjectWithMeta[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');

@@ -9,7 +9,7 @@ import { Inbox } from '@/components/Inbox';
 import { RoleSelectionPage } from '@/components/RoleSelection';
 import { ProjectOnboarding } from '@/components/ProjectOnboarding';
 import { ProfileOnboarding } from '@/components/ProfileOnboarding';
-import { logout } from '@/lib/auth';
+
 
 const GeometricDecorations = () => (
   <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
@@ -49,8 +49,10 @@ const LandingPage = ({ onStartCreate, onViewProjects }: { onStartCreate: () => v
   );
 };
 
+type ViewType = 'landing' | 'role_selection' | 'project_create' | 'profile_create' | 'project_showcase' | 'service_showcase' | 'inbox';
+
 export default function Home() {
-  const [currentView, setCurrentView] = useState<'landing' | 'role_selection' | 'project_create' | 'profile_create' | 'project_showcase' | 'service_showcase' | 'inbox'>('landing');
+  const [currentView, setCurrentView] = useState<ViewType>('landing');
   const [currentUser, setCurrentUser] = useState<{ name: string, avatar?: string } | null>(null);
 
   useEffect(() => {
@@ -58,7 +60,7 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     const view = params.get('view');
     if (view && ['landing', 'role_selection', 'project_create', 'profile_create', 'project_showcase', 'service_showcase', 'inbox'].includes(view)) {
-      setCurrentView(view as any);
+      setCurrentView(view as ViewType);
     }
 
     // Fetch user info to sync UI

@@ -141,7 +141,7 @@ export async function sendChatMessage(
                         if (parsed.delta) {
                             onChunk(parsed.delta);
                         }
-                    } catch (e) {
+                    } catch {
                         // Skip invalid JSON
                     }
                 }

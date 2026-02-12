@@ -35,7 +35,7 @@ export const ProjectArtifact = ({
                             <div className="h-6 bg-gray-100 rounded animate-pulse w-full mt-4"></div>
                         ) : (
                             <p className="text-xl text-ink-light italic font-serif mt-2">
-                                "<HighlightableText text={data.oneLiner} field="oneLiner" annotations={annotations} onSelection={onAddAnnotation} />"
+                                &ldquo;<HighlightableText text={data.oneLiner} field="oneLiner" annotations={annotations} onSelection={onAddAnnotation} />&rdquo;
                             </p>
                         )}
                     </div>
