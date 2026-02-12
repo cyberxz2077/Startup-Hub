@@ -6,13 +6,11 @@ import { cookies } from 'next/headers';
 
 const validateUrl = (url: string | undefined, name: string) => {
     if (!url) return '';
-    // Remove all backtick-like characters
-    url = url.replace(/[`'']/g, '').trim();
+    url = url.replace(/[`'"]/g, '').trim();
     if (!url.startsWith('http')) {
         console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
         return '';
     }
-    // Prevent common mistake where variable name is entered as value
     if (url === name) {
         console.warn(`Environment variable ${name} has its own name as value! Check Vercel settings.`);
         return '';
@@ -54,9 +52,8 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
 
     const tokenEndpoints = [
         config.tokenEndpoint,
-        'https://app.mindos.com/gate/lab/oauth/token',
-        'https://app.mindos.com/oauth/token',
-        'https://app.mindos.com/gate/lab/api/oauth2/token',
+        'https://app.mindos.com/gate/lab/oauth/token/code',
+        'https://app.mindos.com/oauth/token/code',
     ];
 
     let lastError: Error | null = null;
