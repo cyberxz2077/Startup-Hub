@@ -8,25 +8,47 @@ export async function GET() {
     try {
         const session = await getSession();
         if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ 
+                name: null,
+                avatar: null,
+                bio: null,
+                title: "",
+                location: "",
+                skills: [],
+                experienceHighlights: "",
+                education: "",
+                lookingFor: "",
+                superpower: "",
+                others: {},
+            });
         }
 
         const user = await prisma.user.findUnique({
             where: { id: session.id },
-            include: { profile: true } // Include the profile relation
+            include: { profile: true }
         });
 
         if (!user) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            return NextResponse.json({ 
+                name: null,
+                avatar: null,
+                bio: null,
+                title: "",
+                location: "",
+                skills: [],
+                experienceHighlights: "",
+                education: "",
+                lookingFor: "",
+                superpower: "",
+                others: {},
+            });
         }
 
-        // Construct ProfileData from User and Profile
         const profileData = {
             name: user.name || "",
             avatar: user.avatar || undefined,
-            bio: user.bio || "", // User bio takes precedence or fallback? Let's use user bio.
+            bio: user.bio || "",
 
-            // Profile specific fields
             title: user.profile?.title || "",
             location: user.profile?.location || "",
             skills: user.profile?.skills || [],
@@ -51,17 +73,14 @@ export async function POST(request: Request) {
     try {
         const session = await getSession();
         if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ error: 'Unauthorized', message: '请先登录 SecondMe 以保存个人资料' }, { status: 401 });
         }
 
         const data = await request.json();
 
-        // No manual stringify needed
         const skills = Array.isArray(data.skills) ? data.skills : [];
 
-        // Transaction to update User and Upsert Profile
         await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            // 1. Update basic user info
             await tx.user.update({
                 where: { id: session.id },
                 data: {
@@ -71,7 +90,6 @@ export async function POST(request: Request) {
                 },
             });
 
-            // 2. Upsert Profile
             await tx.profile.upsert({
                 where: { userId: session.id },
                 update: {
