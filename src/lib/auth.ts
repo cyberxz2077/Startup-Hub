@@ -6,11 +6,13 @@ import { cookies } from 'next/headers';
 
 const validateUrl = (url: string | undefined, name: string) => {
     if (!url) return '';
-    url = url.replace(/`/g, '').trim();
+    // Remove all backtick-like characters
+    url = url.replace(/[`'']/g, '').trim();
     if (!url.startsWith('http')) {
         console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
         return '';
     }
+    // Prevent common mistake where variable name is entered as value
     if (url === name) {
         console.warn(`Environment variable ${name} has its own name as value! Check Vercel settings.`);
         return '';
