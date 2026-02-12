@@ -53,14 +53,19 @@ export async function GET(request: NextRequest) {
         }
 
         const userInfo = userInfoData.data || userInfoData;
-        console.log('[OAuth Callback] User ID:', userInfo.user_id);
+        const secondmeUserId = userInfo.userId || userInfo.user_id;
+        console.log('[OAuth Callback] User ID:', secondmeUserId);
+
+        if (!secondmeUserId) {
+            throw new Error('No user ID received from SecondMe');
+        }
 
         const prisma = new PrismaClient();
 
         try {
             console.log('[OAuth Callback] Upserting user in database...');
             const user = await prisma.user.upsert({
-                where: { secondmeUserId: userInfo.user_id },
+                where: { secondmeUserId: secondmeUserId },
                 update: {
                     accessToken: tokens.accessToken,
                     refreshToken: tokens.refreshToken,
@@ -70,7 +75,7 @@ export async function GET(request: NextRequest) {
                     bio: userInfo.bio || null,
                 },
                 create: {
-                    secondmeUserId: userInfo.user_id,
+                    secondmeUserId: secondmeUserId,
                     accessToken: tokens.accessToken,
                     refreshToken: tokens.refreshToken,
                     tokenExpiresAt: tokens.expiresAt,
