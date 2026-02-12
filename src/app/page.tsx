@@ -92,7 +92,7 @@ export default function Home() {
       <nav className="h-16 border-b border-border bg-paper/90 backdrop-blur z-50 flex-none flex items-center justify-between px-6 transition-all">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setCurrentView('landing')}>
           <div className="w-8 h-8 bg-ink text-white flex items-center justify-center font-serif font-bold text-xl rounded-sm">H</div>
-          <span className="font-serif font-bold text-lg tracking-wide hidden sm:inline">Startup Hub <span className="text-[10px] bg-ink/10 px-1 rounded ml-1 text-ink-light align-top">v0.5</span></span>
+          <span className="font-serif font-bold text-lg tracking-wide hidden sm:inline">Startup Hub <span className="text-[10px] bg-ink/10 px-1 rounded ml-1 text-ink-light align-top">v1.0</span></span>
         </div>
 
         <div className="flex items-center gap-2 md:gap-6 text-sm font-sans font-medium text-ink-light">
