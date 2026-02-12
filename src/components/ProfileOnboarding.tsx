@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { LayoutGrid, Edit3, Check, X, Camera, Sparkles } from 'lucide-react';
+import { LayoutGrid, Edit3, Check, X, Camera, Sparkles, Loader2 } from 'lucide-react';
 import { ProfileData, Message, Attachment, Annotation, initialProfileData } from '@/types';
 import { AIChat } from './AIChat';
 import { HighlightableText } from './ui/HighlightableText';
 import { AnnotationBubble } from './ui/AnnotationBubble';
 import { AvatarCropper } from './ui/AvatarCropper';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const PROFILE_SYSTEM_INSTRUCTION = `
 You are a top-tier Talent Agent and Career Coach. Help a talent articulate their unique value proposition.
@@ -14,6 +16,32 @@ Tone: Encouraging, sharp, focused on highlighting strengths.
 
 LANGUAGE INSTRUCTION: You MUST detect the language of the user's input (or uploaded file). If the user speaks Chinese (or uploads Chinese content), your 'reply' MUST be in Chinese. If the user speaks English, reply in English. Do not default to English if the input is Chinese.
 `;
+
+const MarkdownRenderer = ({ content, className = '' }: { content: string; className?: string }) => (
+    <div className={`markdown-content ${className}`}>
+        <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+                h1: ({ children }) => <h1 className="text-lg font-bold text-ink mb-2 mt-3 first:mt-0">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-base font-bold text-ink mb-1.5 mt-2.5 first:mt-0">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-sm font-bold text-ink mb-1 mt-2 first:mt-0">{children}</h3>,
+                h4: ({ children }) => <h4 className="text-sm font-semibold text-ink mb-0.5 mt-1.5 first:mt-0">{children}</h4>,
+                p: ({ children }) => <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>,
+                strong: ({ children }) => <strong className="font-bold text-ink">{children}</strong>,
+                em: ({ children }) => <em className="italic">{children}</em>,
+                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
+                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                br: () => <br />,
+                hr: () => <hr className="my-3 border-gray-200" />,
+                code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>,
+            }}
+        >
+            {content}
+        </ReactMarkdown>
+    </div>
+);
 
 const PublishModal = ({ isOpen, onClose, onConfirm, loading }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, loading?: boolean }) => {
     if (!isOpen) return null;
@@ -42,6 +70,7 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
     const [annotations, setAnnotations] = useState<Annotation[]>([]);
     const [selection, setSelection] = useState<{ field: string, text: string, rect: DOMRect } | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isLoadingProfile, setIsLoadingProfile] = useState(true);
     const [showCropper, setShowCropper] = useState(false);
     const [tempImage, setTempImage] = useState<string | null>(null);
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
@@ -49,17 +78,20 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
 
     useEffect(() => {
         const fetchProfile = async () => {
+            setIsLoadingProfile(true);
             try {
                 const res = await fetch('/api/profiles');
                 if (res.ok) {
                     const profileData = await res.json();
                     setData(prev => ({ ...prev, ...profileData }));
                     if (profileData.name) {
-                        setMessages([{ role: 'model', text: `Welcome back, ${profileData.name}! I've loaded your profile. How can we improve it today?` }]);
+                        setMessages([{ role: 'model', text: `欢迎回来，${profileData.name}！我已加载你的个人资料。今天想如何改进它？` }]);
                     }
                 }
             } catch (e) {
                 console.error("Failed to fetch profile", e);
+            } finally {
+                setIsLoadingProfile(false);
             }
         };
         fetchProfile();
@@ -143,7 +175,6 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
         }
     };
 
-    // Ensure skills is array for safe mapping
     const skills = Array.isArray(data.skills) ? data.skills : [];
 
     return (
@@ -155,12 +186,19 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
                         <div className="text-[10px] bg-white px-2 py-1 rounded border border-border text-ink-light">{annotations.length} Annotations</div>
                     </div>
 
+                    {isLoadingProfile ? (
+                        <div className="max-w-3xl mx-auto bg-white/80 p-12 shadow-paper border border-border min-h-[400px] flex items-center justify-center">
+                            <div className="flex flex-col items-center gap-4">
+                                <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
+                                <p className="text-ink-light font-sans text-sm">正在加载您的 SecondMe 信息...</p>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="max-w-3xl mx-auto bg-white/80 p-12 shadow-paper border border-border min-h-full relative">
                         <div className="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
                             <img src="https://www.svgrepo.com/show/491931/resume-cv.svg" className="w-32 h-32" alt="watermark" />
                         </div>
 
-                        {/* Profile Header */}
                         <div className="flex items-end gap-6 border-b-2 border-ink pb-8 mb-8">
                             <div className="relative group">
                                 <div
@@ -173,7 +211,6 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
                                         data.name ? data.name[0] : "?"
                                     )}
 
-                                    {/* Hover Overlay */}
                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                                         <Camera className="w-8 h-8" />
                                     </div>
@@ -194,16 +231,19 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
                             </div>
                         </div>
 
-                        {/* Bio & Superpower */}
                         <div className="space-y-8">
                             <section className="bg-paper p-6 rounded-lg border border-ink/5">
                                 <h3 className="font-bold uppercase text-xs text-ink-light mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-accent-red" /> My Superpower</h3>
-                                <p className="text-lg font-serif italic text-ink"><HighlightableText text={data.superpower} field="superpower" annotations={annotations} onSelection={(f, t, r) => setSelection({ field: f, text: t, rect: r })} /></p>
+                                <div className="text-lg font-serif italic text-ink">
+                                    <MarkdownRenderer content={data.superpower || "Your unique superpower..."} />
+                                </div>
                             </section>
 
                             <section>
                                 <h3 className="font-bold uppercase text-xs text-ink-light mb-2">Professional Bio</h3>
-                                <p className="leading-relaxed"><HighlightableText text={data.bio} field="bio" annotations={annotations} onSelection={(f, t, r) => setSelection({ field: f, text: t, rect: r })} /></p>
+                                <div className="leading-relaxed">
+                                    <MarkdownRenderer content={data.bio || "Your professional background..."} />
+                                </div>
                             </section>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -215,21 +255,28 @@ export const ProfileOnboarding = ({ onBack }: { onBack: () => void }) => {
                                 </section>
                                 <section>
                                     <h3 className="font-bold uppercase text-xs text-ink-light mb-3">Education</h3>
-                                    <p className="text-sm"><HighlightableText text={data.education} field="education" annotations={annotations} onSelection={(f, t, r) => setSelection({ field: f, text: t, rect: r })} /></p>
+                                    <div className="text-sm">
+                                        <MarkdownRenderer content={data.education || "Your education..."} />
+                                    </div>
                                 </section>
                             </div>
 
                             <section>
                                 <h3 className="font-bold uppercase text-xs text-ink-light mb-2">Experience Highlights</h3>
-                                <div className="text-sm leading-relaxed whitespace-pre-wrap"><HighlightableText text={data.experienceHighlights} field="experienceHighlights" annotations={annotations} onSelection={(f, t, r) => setSelection({ field: f, text: t, rect: r })} /></div>
+                                <div className="text-sm leading-relaxed">
+                                    <MarkdownRenderer content={data.experienceHighlights || "Your experience highlights..."} />
+                                </div>
                             </section>
 
                             <section className="border-t border-dashed border-gray-300 pt-6">
                                 <h3 className="font-bold uppercase text-xs text-ink-light mb-2">Looking For</h3>
-                                <p className="text-base text-accent-blue"><HighlightableText text={data.lookingFor} field="lookingFor" annotations={annotations} onSelection={(f, t, r) => setSelection({ field: f, text: t, rect: r })} /></p>
+                                <div className="text-base text-accent-blue">
+                                    <MarkdownRenderer content={data.lookingFor || "What you're looking for..."} />
+                                </div>
                             </section>
                         </div>
                     </div>
+                    )}
                 </div>
 
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-4 z-40">

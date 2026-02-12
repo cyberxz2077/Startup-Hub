@@ -54,12 +54,23 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
     const [selectedRole, setSelectedRole] = useState<'founder' | 'talent' | null>(null);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [isCardExpanded, setIsCardExpanded] = useState(false);
+    const [isCardExpanded, setIsCardExpanded] = useState(true);
+    const [shouldAutoCollapse, setShouldAutoCollapse] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchUserInfo();
     }, []);
+
+    useEffect(() => {
+        if (userInfo && isCardExpanded && !shouldAutoCollapse) {
+            const timer = setTimeout(() => {
+                setShouldAutoCollapse(true);
+                setIsCardExpanded(false);
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [userInfo, isCardExpanded, shouldAutoCollapse]);
 
     const fetchUserInfo = async () => {
         setIsLoading(true);
@@ -100,25 +111,60 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
         window.location.href = '/api/auth/login';
     };
 
+    const handleCardMouseEnter = () => {
+        if (userInfo) {
+            setIsCardExpanded(true);
+        }
+    };
+
+    const handleCardMouseLeave = () => {
+        if (userInfo && shouldAutoCollapse) {
+            setIsCardExpanded(false);
+        }
+    };
+
     const UserInfoCard = () => {
-        const hasBio = userInfo?.bio && userInfo.bio.length > 100;
-        
+        if (!userInfo) {
+            return (
+                <div className="mt-8 rounded-xl border bg-gray-50 border-gray-200 p-6">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-ink font-medium">未登录 SecondMe</p>
+                            <p className="text-ink-light text-sm">登录后可同步您的身份信息</p>
+                        </div>
+                        <button 
+                            onClick={handleLogin}
+                            className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-lg text-sm font-medium hover:bg-ink-light transition-colors"
+                        >
+                            <LogIn className="w-4 h-4" />
+                            登录
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div 
                 ref={cardRef}
-                className={`mt-8 rounded-xl border transition-all duration-300 ease-out ${
-                    userInfo ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
-                } ${isCardExpanded && hasBio ? 'shadow-lg' : ''}`}
-                onMouseEnter={() => hasBio && setIsCardExpanded(true)}
-                onMouseLeave={() => setIsCardExpanded(false)}
+                className={`mt-8 rounded-xl border transition-all duration-500 ease-out overflow-hidden ${
+                    isCardExpanded 
+                        ? 'bg-orange-50 border-orange-200 shadow-lg' 
+                        : 'bg-orange-50/80 border-orange-200/60'
+                }`}
+                onMouseEnter={handleCardMouseEnter}
+                onMouseLeave={handleCardMouseLeave}
             >
-                {userInfo ? (
-                    <div className="p-6">
-                        <div className="flex items-center gap-2 text-green-700 font-bold mb-4">
-                            <CheckCircle className="w-5 h-5" />
-                            <span>已获取您的 SecondMe 身份信息</span>
-                        </div>
-                        <div className="flex items-start gap-4">
+                <div className={`transition-all duration-500 ease-out ${isCardExpanded ? 'p-6' : 'p-3'}`}>
+                    <div className={`flex items-center gap-2 text-orange-700 font-bold ${isCardExpanded ? 'mb-4' : ''}`}>
+                        <CheckCircle className="w-5 h-5" />
+                        <span className={isCardExpanded ? '' : 'text-sm'}>
+                            {isCardExpanded ? '已获取您的 SecondMe 身份信息' : `已登录: ${userInfo.name}`}
+                        </span>
+                    </div>
+                    
+                    {isCardExpanded && (
+                        <div className="flex items-start gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                             {userInfo.avatar ? (
                                 <img 
                                     src={userInfo.avatar} 
@@ -150,50 +196,21 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                                 </div>
                                 
                                 {userInfo.bio && (
-                                    <div 
-                                        className={`mt-2 overflow-hidden transition-all duration-300 ease-out ${
-                                            isCardExpanded && hasBio ? 'max-h-[500px]' : 'max-h-16'
-                                        }`}
-                                    >
-                                        <div className={`p-3 bg-white/60 rounded-lg border border-green-100 ${
-                                            isCardExpanded && hasBio ? '' : 'relative'
-                                        }`}>
-                                            <MarkdownRenderer content={userInfo.bio} />
-                                            {!isCardExpanded && hasBio && (
-                                                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/80 to-transparent pointer-events-none" />
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                {hasBio && (
-                                    <div className={`flex items-center justify-center gap-1 text-xs text-gray-400 mt-2 transition-opacity duration-200 ${
-                                        isCardExpanded ? 'opacity-0' : 'opacity-100'
-                                    }`}>
-                                        <ChevronUp className="w-3 h-3" />
-                                        <span>鼠标悬停查看完整信息</span>
+                                    <div className="mt-2 p-3 bg-white/60 rounded-lg border border-orange-100 max-h-60 overflow-y-auto">
+                                        <MarkdownRenderer content={userInfo.bio} />
                                     </div>
                                 )}
                             </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-ink font-medium">未登录 SecondMe</p>
-                                <p className="text-ink-light text-sm">登录后可同步您的身份信息</p>
-                            </div>
-                            <button 
-                                onClick={handleLogin}
-                                className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-lg text-sm font-medium hover:bg-ink-light transition-colors"
-                            >
-                                <LogIn className="w-4 h-4" />
-                                登录
-                            </button>
+                    )}
+                    
+                    {!isCardExpanded && shouldAutoCollapse && (
+                        <div className="flex items-center justify-center gap-1 text-xs text-orange-500 mt-1">
+                            <ChevronUp className="w-3 h-3" />
+                            <span>鼠标悬停查看完整信息</span>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
         );
     };
