@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
                 path: '/',
             });
 
-            // 5. 重定向到角色选择页面
-            return NextResponse.redirect(new URL('/?view=role_selection', request.url));
+            // 5. 重定向到首页
+            return NextResponse.redirect(new URL('/', request.url));
         } finally {
             await prisma.$disconnect();
         }

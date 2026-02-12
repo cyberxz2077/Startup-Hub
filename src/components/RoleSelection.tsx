@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Briefcase, User, ArrowRight, CornerDownLeft, Building2, FileText, ChevronRight, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Briefcase, User, ArrowRight, CornerDownLeft, Building2, FileText, ChevronRight, CheckCircle, Loader2, LogIn } from 'lucide-react';
 
 interface UserInfo {
     name: string;
@@ -25,8 +25,7 @@ const GeometricDecorations = () => (
 export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_create' | 'profile_create') => void }) => {
     const [selectedRole, setSelectedRole] = useState<'founder' | 'talent' | null>(null);
     const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isAuthenticating, setIsAuthenticating] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     useEffect(() => {
         fetchUserInfo();
@@ -54,16 +53,11 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
         }
     };
 
-    const handleRoleClick = async (role: 'founder' | 'talent') => {
-        if (userInfo) {
-            if (role === 'talent') {
-                onNavigate('profile_create');
-            } else {
-                setSelectedRole('founder');
-            }
+    const handleRoleClick = (role: 'founder' | 'talent') => {
+        if (role === 'talent') {
+            onNavigate('profile_create');
         } else {
-            setIsAuthenticating(true);
-            window.location.href = '/api/auth/login';
+            setSelectedRole('founder');
         }
     };
 
@@ -72,8 +66,12 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
         else onNavigate('profile_create');
     };
 
+    const handleLogin = () => {
+        window.location.href = '/api/auth/login';
+    };
+
     const UserInfoCard = () => (
-        <div className={`mt-8 p-6 rounded-xl border ${userInfo ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+        <div className="mt-8 p-6 rounded-xl border bg-gray-50 border-gray-200">
             {userInfo ? (
                 <div className="space-y-4">
                     <div className="flex items-center gap-2 text-green-700 font-bold">
@@ -114,20 +112,19 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                 </div>
             ) : (
                 <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-red-700 font-bold">
-                        <XCircle className="w-5 h-5" />
-                        <span>未成功获取到您的 SecondMe 身份信息</span>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-ink font-medium">未登录 SecondMe</p>
+                            <p className="text-ink-light text-sm">登录后可同步您的身份信息</p>
+                        </div>
+                        <button 
+                            onClick={handleLogin}
+                            className="flex items-center gap-2 px-4 py-2 bg-ink text-white rounded-lg text-sm font-medium hover:bg-ink-light transition-colors"
+                        >
+                            <LogIn className="w-4 h-4" />
+                            登录
+                        </button>
                     </div>
-                    <p className="text-red-600 text-sm">请重新尝试～</p>
-                    <button 
-                        onClick={() => {
-                            setIsAuthenticating(true);
-                            window.location.href = '/api/auth/login';
-                        }}
-                        className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-                    >
-                        重新登录
-                    </button>
                 </div>
             )}
         </div>
@@ -152,43 +149,29 @@ export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <button 
                                 onClick={() => handleRoleClick('founder')} 
-                                disabled={isAuthenticating}
-                                className="group relative bg-white border border-border p-8 rounded-xl shadow-paper hover:shadow-float transition-all hover:-translate-y-1 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="group relative bg-white border border-border p-8 rounded-xl shadow-paper hover:shadow-float transition-all hover:-translate-y-1 text-left"
                             >
-                                {isAuthenticating ? (
-                                    <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6">
-                                        <Loader2 className="w-8 h-8 animate-spin text-ink" />
-                                    </div>
-                                ) : (
-                                    <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6 group-hover:bg-ink group-hover:text-white transition-colors">
-                                        <Briefcase className="w-8 h-8" />
-                                    </div>
-                                )}
+                                <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6 group-hover:bg-ink group-hover:text-white transition-colors">
+                                    <Briefcase className="w-8 h-8" />
+                                </div>
                                 <h3 className="text-2xl font-serif font-bold text-ink mb-2">I am a Founder</h3>
                                 <p className="text-ink-light text-sm leading-relaxed">I have a vision and I&apos;m looking for builders to bring it to life. I need to recruit a team.</p>
                                 <div className="mt-8 flex items-center text-sm font-bold uppercase tracking-wider text-accent-red opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {isAuthenticating ? 'Redirecting...' : 'Select'} <ArrowRight className="w-4 h-4 ml-2" />
+                                    Select <ArrowRight className="w-4 h-4 ml-2" />
                                 </div>
                             </button>
 
                             <button 
                                 onClick={() => handleRoleClick('talent')} 
-                                disabled={isAuthenticating}
-                                className="group relative bg-white border border-border p-8 rounded-xl shadow-paper hover:shadow-float transition-all hover:-translate-y-1 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="group relative bg-white border border-border p-8 rounded-xl shadow-paper hover:shadow-float transition-all hover:-translate-y-1 text-left"
                             >
-                                {isAuthenticating ? (
-                                    <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6">
-                                        <Loader2 className="w-8 h-8 animate-spin text-accent-blue" />
-                                    </div>
-                                ) : (
-                                    <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6 group-hover:bg-accent-blue group-hover:text-white transition-colors">
-                                        <User className="w-8 h-8" />
-                                    </div>
-                                )}
+                                <div className="w-16 h-16 bg-paper rounded-full flex items-center justify-center mb-6 group-hover:bg-accent-blue group-hover:text-white transition-colors">
+                                    <User className="w-8 h-8" />
+                                </div>
                                 <h3 className="text-2xl font-serif font-bold text-ink mb-2">I am a Talent</h3>
                                 <p className="text-ink-light text-sm leading-relaxed">I have exceptional skills and I&apos;m looking for a high-potential ship to board.</p>
                                 <div className="mt-8 flex items-center text-sm font-bold uppercase tracking-wider text-accent-blue opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {isAuthenticating ? 'Redirecting...' : 'Select'} <ArrowRight className="w-4 h-4 ml-2" />
+                                    Select <ArrowRight className="w-4 h-4 ml-2" />
                                 </div>
                             </button>
                         </div>
