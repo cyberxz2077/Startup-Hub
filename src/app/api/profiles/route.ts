@@ -47,7 +47,7 @@ export async function GET() {
         const profileData = {
             name: user.name || "",
             avatar: user.avatar || undefined,
-            bio: user.bio || "",
+            bio: "",
 
             title: user.profile?.title || "",
             location: user.profile?.location || "",
