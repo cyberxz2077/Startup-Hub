@@ -47,13 +47,14 @@ export function generateAuthUrl(): string {
 
 export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
-    console.log('Exchanging code for tokens at:', config.tokenEndpoint);
+    console.log('Exchanging code for tokens...');
     console.log('Using redirect_uri:', config.redirectUri);
 
+    // 根据官方文档，正确的端点
+    // https://app.mindos.com/gate/lab/api/oauth/token/code
     const tokenEndpoints = [
+        'https://app.mindos.com/gate/lab/api/oauth/token/code',
         config.tokenEndpoint,
-        'https://app.mindos.com/gate/lab/oauth/token/code',
-        'https://app.mindos.com/oauth/token/code',
     ];
 
     let lastError: Error | null = null;
@@ -75,6 +76,8 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
                     redirect_uri: config.redirectUri,
                 }),
             });
+
+            console.log(`Response status: ${response.status}`);
 
             if (response.ok) {
                 const json = await response.json();
@@ -112,7 +115,9 @@ export async function exchangeCodeForTokens(code: string): Promise<SecondMeToken
 
 export async function refreshAccessToken(refreshToken: string): Promise<SecondMeTokens> {
     const config = getAuthConfig();
-    const response = await fetch(config.tokenEndpoint, {
+    // 根据官方文档，刷新 Token 端点
+    // https://app.mindos.com/gate/lab/api/oauth/token/refresh
+    const response = await fetch('https://app.mindos.com/gate/lab/api/oauth/token/refresh', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
