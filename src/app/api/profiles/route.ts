@@ -52,7 +52,7 @@ export async function GET() {
             title: user.profile?.title || "",
             location: user.profile?.location || "",
             skills: user.profile?.skills || [],
-            experienceHighlights: user.profile?.experienceHighlights || "",
+            experienceHighlights: user.profile?.experienceHighlights || user.bio || "",
             education: user.profile?.education || "",
             lookingFor: user.profile?.lookingFor || "",
             superpower: user.profile?.superpower || "",

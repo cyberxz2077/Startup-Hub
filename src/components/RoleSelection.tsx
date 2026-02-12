@@ -24,31 +24,43 @@ const GeometricDecorations = () => (
     </div>
 );
 
-const MarkdownRenderer = ({ content, className = '' }: { content: string; className?: string }) => (
-    <div className={`markdown-content text-sm text-ink-light ${className}`}>
-        <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-                h1: ({ children }) => <h1 className="text-lg font-bold text-ink mb-2 mt-3 first:mt-0">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-base font-bold text-ink mb-1.5 mt-2.5 first:mt-0">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-sm font-bold text-ink mb-1 mt-2 first:mt-0">{children}</h3>,
-                h4: ({ children }) => <h4 className="text-sm font-semibold text-ink mb-0.5 mt-1.5 first:mt-0">{children}</h4>,
-                p: ({ children }) => <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>,
-                strong: ({ children }) => <strong className="font-bold text-ink">{children}</strong>,
-                em: ({ children }) => <em className="italic">{children}</em>,
-                ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
-                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                br: () => <br />,
-                hr: () => <hr className="my-3 border-gray-200" />,
-                code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>,
-            }}
-        >
-            {content}
-        </ReactMarkdown>
-    </div>
-);
+const MarkdownRenderer = ({ content, className = '' }: { content: string; className?: string }) => {
+    const cleanContent = (text: string) => {
+        if (!text) return '';
+        let cleaned = text;
+        cleaned = cleaned.replace(/#{4,}/g, '###');
+        cleaned = cleaned.replace(/^(#{1,3})([^#\s])/gm, '$1 $2');
+        cleaned = cleaned.replace(/([^#\s])(#{1,3})$/gm, '$1');
+        cleaned = cleaned.replace(/###\s*###/g, '');
+        return cleaned;
+    };
+
+    return (
+        <div className={`markdown-content text-sm text-ink-light ${className}`}>
+            <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                    h1: ({ children }) => <h1 className="text-lg font-bold text-ink mb-2 mt-3 first:mt-0">{children}</h1>,
+                    h2: ({ children }) => <h2 className="text-base font-bold text-ink mb-1.5 mt-2.5 first:mt-0">{children}</h2>,
+                    h3: ({ children }) => <h3 className="text-sm font-bold text-ink mb-1 mt-2 first:mt-0">{children}</h3>,
+                    h4: ({ children }) => <h4 className="text-sm font-semibold text-ink mb-0.5 mt-1.5 first:mt-0">{children}</h4>,
+                    p: ({ children }) => <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>,
+                    strong: ({ children }) => <strong className="font-bold text-ink">{children}</strong>,
+                    em: ({ children }) => <em className="italic">{children}</em>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-0.5">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-0.5">{children}</ol>,
+                    li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                    br: () => <br />,
+                    hr: () => <hr className="my-3 border-gray-200" />,
+                    code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                    blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-3 italic text-gray-600 my-2">{children}</blockquote>,
+                }}
+            >
+                {cleanContent(content)}
+            </ReactMarkdown>
+        </div>
+    );
+};
 
 export const RoleSelectionPage = ({ onNavigate }: { onNavigate: (view: 'project_create' | 'profile_create') => void }) => {
     const [selectedRole, setSelectedRole] = useState<'founder' | 'talent' | null>(null);
