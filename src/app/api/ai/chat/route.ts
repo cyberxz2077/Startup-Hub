@@ -38,10 +38,32 @@ export async function POST(req: NextRequest) {
 
         console.log(`[AI Proxy] Processing ${messages.length} messages. Has Attachment: ${!!attachment}`);
 
-        const history = messages.slice(0, -1).map((msg: ChatMessage) => ({
-            role: msg.role === 'model' ? 'model' : 'user',
-            parts: [{ text: msg.text }]
-        }));
+        const allButLast = messages.slice(0, -1);
+        
+        let history = allButLast
+            .map((msg: ChatMessage) => ({
+                role: msg.role === 'model' ? 'model' : 'user',
+                parts: [{ text: msg.text }]
+            }))
+            .filter((_, index, arr) => {
+                if (index === 0 && arr[0].role === 'model') {
+                    return false;
+                }
+                return true;
+            });
+
+        if (history.length > 0 && history[history.length - 1].role === 'model') {
+            const lastModel = history.pop();
+            if (lastModel) {
+                history.push({
+                    role: 'user',
+                    parts: [{ text: '(继续之前的对话)' }]
+                });
+                history.push(lastModel);
+            }
+        }
+
+        console.log('[AI Proxy] History length:', history.length);
 
         const chat = model.startChat({
             history: history,
