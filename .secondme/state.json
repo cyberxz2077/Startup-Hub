@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "stage": "prd",
+  "stage": "retired",
   "app_name": "Startup Hub",
   "modules": [
     "auth",
@@ -10,7 +10,7 @@
   ],
   "config": {
     "client_id": "28454aca-bb08-4232-a5e6-ed590dda8748",
-    "client_secret": "ae1b39d6c5db5acadfc3c5e204bde4f7e4b6ecf703604b413b7802871ad50893",
+    "client_secret": "",
     "redirect_uri": "http://localhost:3000/api/auth/callback",
     "redirect_uris": [
       "http://localhost:3000/api/auth/callback"
@@ -73,5 +73,6 @@
       "项目录入页",
       "用户档案录入页"
     ]
-  }
+  },
+  "retired_note": "2026-10-23: SecondMe integration disabled. Historical metadata only; use .env.local for current configuration. Revoke the previously tracked client secret at the provider."
 }

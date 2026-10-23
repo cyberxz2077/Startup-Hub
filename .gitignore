@@ -43,3 +43,9 @@ yarn-error.log*
 *.db
 *.db-journal
 /prisma/dev.db
+
+# Local QA artifacts (isolated fixtures; never deploy)
+/output/
+/test-results/
+/playwright-report/
+/.playwright-cli/

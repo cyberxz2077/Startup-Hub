@@ -1,54 +1,10 @@
-# SecondMe 集成项目 - Startup Hub
+# Startup Hub
 
-## 应用信息
+当前实现：Next.js 15 + React 19 + Prisma / PostgreSQL。自然语言整理与匹配使用服务端 DeepSeek API。
 
-- **App Name**: Startup Hub
-- **Client ID**: 28454aca-bb08-****-****-************
-
-## API 文档
-
-开发时请参考官方文档:
-
-| 文档 | 链接 |
-|------|------|
-| 快速入门 | https://develop-docs.second.me/zh/docs |
-| OAuth2 认证 | https://develop-docs.second.me/zh/docs/authentication/oauth2 |
-| API 参考 | https://develop-docs.second.me/zh/docs/api-reference/secondme |
-| 错误码 | https://develop-docs.second.me/zh/docs/errors |
-
-## 关键信息
-
-- **API 基础 URL**: `https://app.mindos.com/gate/lab`
-- **OAuth 授权 URL**: `https://go.second.me/oauth/`
-- **Access Token 有效期**: 2 小时
-- **Refresh Token 有效期**: 30 天
-
-> 所有 API 端点配置请参考 `.secondme/state.json` 中的 `api` 和 `docs` 字段
-
-## 已选模块
-
-根据 Allowed Scopes 自动推断的功能模块:
-
-| 模块 | 说明 | 依赖 Scope |
-|------|------|-----------|
-| **auth** | OAuth 认证 | `user.info` |
-| **profile** | 用户信息展示 | `user.info.shades`, `user.info.softmemory` |
-| **chat** | 聊天功能 | `chat` |
-| **note** | 笔记功能 | `note.add` |
-
-## 权限列表 (Scopes)
-
-| 权限 | 说明 | 状态 |
-|------|------|------|
-| `user.info` | 用户基础信息 | ✅ 已授权 |
-| `user.info.shades` | 用户兴趣标签 | ✅ 已授权 |
-| `user.info.softmemory` | 用户软记忆 | ✅ 已授权 |
-| `chat` | 聊天功能 | ✅ 已授权 |
-| `note.add` | 添加笔记 | ✅ 已授权 |
-| `voice` | 语音功能 | ✅ 已授权 (暂不生成代码) |
-
-## 待补充信息
-
-⚠️ 请在 `.secondme/state.json` 中补充以下信息:
-- `config.client_secret`: SecondMe 应用的 Client Secret
-- `config.database_url`: 数据库连接串 (PostgreSQL/MySQL/SQLite)
+- 认证：服务端 `REGISTRATION_INVITE_CODE` 通用邀请码准入，首次设置用户名与至少 12 位密码；scrypt 密码哈希，7 天不透明会话。没有 SecondMe OAuth 入口；邮箱 OTP 路由已退役。
+- 当前配置看 `.env.example`；本地密钥只填写被 Git 忽略的 `.env.local`。
+- `README.md` 说明开发入口，`docs/重新上线.md` 说明部署选型、配置与迁移步骤，`docs/代码审核与验证.md` 记录本次修补与验证范围。
+- `.secondme/` 和 `.agents/skills/secondme*` 是历史初始化资料，当前应用不读取它们。不要根据这些旧模板恢复登录或模型调用。
+- `prisma/schema.prisma` 中保留的旧 OAuth 列仅用于无损迁移；不能用作认证依据。
+- 本轮已获重新部署授权。现有 Supabase 项目 `gsvvxlqfkyeczoptonrd` 已恢复、快照并完成四个 Prisma 迁移；状态以部署文档与平台实况为准。历史账号关联仍需核实归属。构建不会自动迁移数据库。

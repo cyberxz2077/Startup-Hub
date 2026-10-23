@@ -1,28 +1,36 @@
-import { NextResponse } from 'next/server';
-import { generateAuthUrl } from '@/lib/auth';
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { usernameSchema } from "@/lib/validation";
+import { apiError, json, readJson, sameOrigin } from "@/lib/http";
+import { loginMember } from "@/lib/password-auth";
+import { rateLimit, requestIdentity } from "@/lib/rate-limit";
+import { newSessionToken, setSessionCookie, logout } from "@/lib/auth";
 
-/**
- * OAuth 登录 - 重定向到 SecondMe 授权页
- */
-export async function GET() {
-    try {
-        const authUrl = generateAuthUrl();
-        console.log('Generated Auth URL:', authUrl);
-
-        if (!authUrl || authUrl.startsWith('?')) {
-            console.error('Invalid Auth URL generated - likely missing SECONDME_OAUTH_URL');
-            return NextResponse.json({ error: 'Auth configuration missing' }, { status: 500 });
-        }
-
-        return NextResponse.redirect(authUrl);
-    } catch (error: unknown) {
-        console.error('Login Route Error:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        const errorStack = error instanceof Error ? error.stack : undefined;
-        return NextResponse.json({
-            error: 'Internal Server Error',
-            details: errorMessage,
-            stack: errorStack
-        }, { status: 500 });
-    }
+export async function GET(request: Request) {
+  return NextResponse.redirect(new URL("/?view=login", request.url));
+}
+export async function POST(request: Request) {
+  try {
+    sameOrigin(request);
+    const { username, password } = await readJson(
+      request,
+      z
+        .object({
+          username: usernameSchema,
+          password: z.string().min(1).max(128),
+        })
+        .strict(),
+      3000,
+    );
+    await rateLimit(`login:ip:${requestIdentity(request)}`, 20, 600);
+    await rateLimit(`login:username:${username}`, 10, 600);
+    await rateLimit("login:global", 600, 3600);
+    const token = newSessionToken();
+    const user = await loginMember(username, password, token);
+    await logout();
+    await setSessionCookie(token);
+    return json({ user });
+  } catch (error) {
+    return apiError(error);
+  }
 }

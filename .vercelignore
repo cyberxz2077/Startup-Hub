@@ -1,0 +1,10 @@
+.env*
+.git
+.secondme
+.agents
+.agent
+output
+test-results
+playwright-report
+.playwright-cli
+*.tsbuildinfo

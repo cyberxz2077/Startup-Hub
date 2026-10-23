@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
-import { logout } from '@/lib/auth';
-
-/**
- * 登出
- */
-export async function POST() {
+import { logout } from "@/lib/auth";
+import { apiError, json, sameOrigin } from "@/lib/http";
+export async function POST(request: Request) {
+  try {
+    sameOrigin(request);
     await logout();
-    return NextResponse.json({ success: true });
+    return json({ success: true });
+  } catch (error) {
+    return apiError(error);
+  }
 }

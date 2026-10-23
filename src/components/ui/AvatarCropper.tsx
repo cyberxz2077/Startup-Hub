@@ -1,102 +1,125 @@
-import { useState, useRef } from 'react';
-import { X, ZoomIn, ZoomOut, Move } from 'lucide-react';
-
-export const AvatarCropper = ({ imageSrc, onCancel, onSave }: { imageSrc: string, onCancel: () => void, onSave: (data: string) => void }) => {
-    const [scale, setScale] = useState(1);
-    const [pos, setPos] = useState({ x: 0, y: 0 });
-    const [dragging, setDragging] = useState(false);
-    const lastPos = useRef({ x: 0, y: 0 });
-    const imgRef = useRef<HTMLImageElement>(null);
-    const CROP_SIZE = 250;
-
-    const handleMouseDown = (e: React.MouseEvent) => {
-        setDragging(true);
-        lastPos.current = { x: e.clientX, y: e.clientY };
+"use client";
+import { useRef, useState } from "react";
+import { Modal } from "./Modal";
+import { X, ZoomIn, ZoomOut } from "lucide-react";
+export function AvatarCropper({
+  imageSrc,
+  onCancel,
+  onSave,
+}: {
+  imageSrc: string;
+  onCancel: () => void;
+  onSave: (data: string) => void;
+}) {
+  const image = useRef<HTMLImageElement>(null);
+  const drag = useRef<{ x: number; y: number } | null>(null);
+  const [base, setBase] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const bound = (x: number, y: number, factor = zoom) => {
+    const img = image.current;
+    if (!img) return { x: 0, y: 0 };
+    const maxX = Math.max(0, (img.naturalWidth * base * factor - 250) / 2);
+    const maxY = Math.max(0, (img.naturalHeight * base * factor - 250) / 2);
+    return {
+      x: Math.max(-maxX, Math.min(maxX, x)),
+      y: Math.max(-maxY, Math.min(maxY, y)),
     };
-
-    const handleMouseMove = (e: React.MouseEvent) => {
-        if (!dragging) return;
-        const dx = e.clientX - lastPos.current.x;
-        const dy = e.clientY - lastPos.current.y;
-        setPos(p => ({ x: p.x + dx, y: p.y + dy }));
-        lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const handleMouseUp = () => setDragging(false);
-
-    const handleSave = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = CROP_SIZE;
-        canvas.height = CROP_SIZE;
-        const ctx = canvas.getContext('2d');
-        if (ctx && imgRef.current) {
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
-
-            ctx.save();
-            // Center align
-            ctx.translate(CROP_SIZE / 2 + pos.x, CROP_SIZE / 2 + pos.y);
-            ctx.scale(scale, scale);
-            ctx.drawImage(imgRef.current, -imgRef.current.naturalWidth / 2, -imgRef.current.naturalHeight / 2);
-            ctx.restore();
-            onSave(canvas.toDataURL('image/jpeg', 0.9));
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl overflow-hidden w-full max-w-md animate-in fade-in zoom-in-95">
-                <div className="p-4 border-b border-border flex justify-between items-center">
-                    <h3 className="font-serif font-bold text-ink">Edit Profile Picture</h3>
-                    <button onClick={onCancel}><X className="w-5 h-5 text-ink-light hover:text-ink" /></button>
-                </div>
-
-                <div className="p-8 flex flex-col items-center gap-6 bg-paper-texture">
-                    <div
-                        className="w-[250px] h-[250px] border-2 border-dashed border-ink/30 rounded-full overflow-hidden relative cursor-move shadow-inner bg-gray-100"
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                    >
-                        {/* Visual Guide Overlay */}
-                        <div className="absolute inset-0 pointer-events-none z-10 rounded-full border border-white/50"></div>
-
-                        <img
-                            ref={imgRef}
-                            src={imageSrc}
-                            alt="Crop Target"
-                            className="max-w-none absolute top-1/2 left-1/2 select-none"
-                            style={{
-                                transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${scale})`,
-                                pointerEvents: 'none'
-                            }}
-                            draggable={false}
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-4 w-full max-w-[250px]">
-                        <ZoomOut className="w-4 h-4 text-ink-light" />
-                        <input
-                            type="range"
-                            min="0.5"
-                            max="3"
-                            step="0.05"
-                            value={scale}
-                            onChange={(e) => setScale(parseFloat(e.target.value))}
-                            className="flex-1 accent-ink cursor-pointer"
-                        />
-                        <ZoomIn className="w-4 h-4 text-ink-light" />
-                    </div>
-
-                    <p className="text-xs text-ink-light flex items-center gap-1"><Move className="w-3 h-3" /> Drag to position</p>
-                </div>
-
-                <div className="p-4 border-t border-border bg-gray-50 flex gap-3">
-                    <button onClick={onCancel} className="flex-1 py-2 text-sm font-medium text-ink-light hover:text-ink hover:bg-gray-200 rounded transition-colors">Cancel</button>
-                    <button onClick={handleSave} className="flex-1 py-2 text-sm font-medium bg-ink text-white hover:bg-ink-light rounded shadow-lg transition-colors">Save Photo</button>
-                </div>
-            </div>
-        </div>
+  };
+  const save = () => {
+    if (!image.current || !base) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 250;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, 250, 250);
+    ctx.translate(125 + pos.x, 125 + pos.y);
+    ctx.scale(base * zoom, base * zoom);
+    ctx.drawImage(
+      image.current,
+      -image.current.naturalWidth / 2,
+      -image.current.naturalHeight / 2,
     );
-};
+    onSave(canvas.toDataURL("image/jpeg", 0.85));
+  };
+  return (
+    <Modal title="调整头像" onClose={onCancel}>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold">调整头像</h2>
+        <button
+          onClick={onCancel}
+          className="icon-btn"
+          aria-label="关闭头像编辑"
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div
+        className="mx-auto w-[250px] h-[250px] rounded-full overflow-hidden relative bg-paper border border-border cursor-move touch-none"
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drag.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current) return;
+          const dx = e.clientX - drag.current.x,
+            dy = e.clientY - drag.current.y;
+          drag.current = { x: e.clientX, y: e.clientY };
+          setPos((p) => bound(p.x + dx, p.y + dy));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
+        onPointerCancel={() => {
+          drag.current = null;
+        }}
+      >
+        {/* Canvas uses this local data URL at its natural dimensions; optimization would change crop geometry. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={image}
+          src={imageSrc}
+          alt="待裁剪的头像"
+          draggable={false}
+          className="absolute max-w-none left-1/2 top-1/2 pointer-events-none"
+          onLoad={(e) =>
+            setBase(
+              Math.max(
+                250 / e.currentTarget.naturalWidth,
+                250 / e.currentTarget.naturalHeight,
+              ),
+            )
+          }
+          style={{
+            transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${base * zoom})`,
+          }}
+        />
+      </div>
+      <label className="flex items-center gap-3 mt-6">
+        <ZoomOut size={17} />
+        <span className="sr-only">头像缩放</span>
+        <input
+          type="range"
+          min={1}
+          max={3}
+          step={0.05}
+          value={zoom}
+          className="flex-1 accent-accent-blue"
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            setZoom(next);
+            setPos((p) => bound(p.x, p.y, next));
+          }}
+        />
+        <ZoomIn size={17} />
+      </label>
+      <p className="text-xs text-ink-light text-center my-5">
+        拖动调整位置，滑动放大。
+      </p>
+      <button className="btn-primary w-full" onClick={save} disabled={!base}>
+        使用这张头像
+      </button>
+    </Modal>
+  );
+}

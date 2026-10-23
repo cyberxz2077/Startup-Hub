@@ -1,35 +1,57 @@
 {
-  "name": "startup-hub-init",
-  "version": "0.1.0",
+  "name": "startup-hub",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint --no-warn-ignored src tests scripts *.ts *.mjs",
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:generate": "prisma generate",
+    "db:deploy": "tsx scripts/migrate.ts",
+    "invite": "tsx scripts/create-invite.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
-    "@prisma/client": "^6.2.0",
+    "@prisma/client": "6.19.2",
     "lucide-react": "^0.563.0",
-    "next": "^15.5.12",
+    "next": "15.5.28",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@supabase/supabase-js": "2.118.0",
+    "server-only": "0.0.1",
+    "@next/env": "15.5.28"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.3",
-    "@types/node": "^20",
+    "@types/node": "^22.0.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.24",
     "eslint": "^9",
-    "eslint-config-next": "15.1.7",
-    "postcss": "^8",
-    "prisma": "^6.19.2",
+    "eslint-config-next": "15.5.28",
+    "postcss": "8.5.31",
+    "prisma": "6.19.2",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  }
+    "typescript": "^5",
+    "vitest": "4.1.12",
+    "tsx": "^4.20.6"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "effect": "^3.20.0",
+      "deepmerge-ts": "8.0.0"
+    },
+    "postcss-selector-parser": "^7.1.6",
+    "postcss": "$postcss"
+  },
+  "type": "module"
 }

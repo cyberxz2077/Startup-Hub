@@ -1,145 +1,162 @@
-import { NextResponse } from 'next/server';
-import { getSession } from '@/lib/auth';
-import { PrismaClient } from '@prisma/client';
+import { z } from "zod";
+import { prisma } from "@/lib/db";
+import { requireSession, memberWhere } from "@/lib/auth";
+import { apiError, json, readJson, sameOrigin, HttpError } from "@/lib/http";
+import { hashToken, rateLimit } from "@/lib/rate-limit";
 
-const prisma = new PrismaClient();
-
-const TEST_MESSAGES = [
-    {
-        targetName: "AI Health Assistant",
-        targetType: "project",
-        messages: [
-            { role: "assistant", content: "Hi! I noticed you're interested in the AI Health Assistant project. We're currently looking for a ML Engineer to join our team. Would you like to learn more about the role?" },
-            { role: "user", content: "Yes, I'd love to hear more! What's the tech stack you're using?" },
-            { role: "assistant", content: "Great! We're using PyTorch for our ML models, FastAPI for the backend, and React Native for mobile. The role involves improving our health prediction models and working with our medical data team." }
-        ]
-    },
-    {
-        targetName: "GreenChain",
-        targetType: "project",
-        messages: [
-            { role: "assistant", content: "Welcome! I'm the founder of GreenChain. I see you have experience in blockchain development. We're building a carbon credit marketplace and would love to discuss potential collaboration." },
-            { role: "user", content: "That sounds interesting! What blockchain are you building on?" },
-            { role: "assistant", content: "We're on Ethereum with plans to expand to Polygon for lower gas fees. Our smart contracts handle carbon credit verification and trading. Would you be interested in a technical discussion?" }
-        ]
-    },
-    {
-        targetName: "TechVentures Capital",
-        targetType: "service",
-        messages: [
-            { role: "assistant", content: "Hello! I'm a partner at TechVentures Capital. We focus on early-stage AI and SaaS investments. I'd be happy to learn more about your startup journey." },
-            { role: "user", content: "Thanks for reaching out! We're building an AI-powered skill assessment platform. Currently at pre-seed stage." },
-            { role: "assistant", content: "That's an exciting space! We've seen a lot of activity in EdTech. Could you share more about your traction and what makes your approach unique?" }
-        ]
+export async function GET(request: Request) {
+  try {
+    const user = await requireSession();
+    const params = new URL(request.url).searchParams;
+    const id = params.get("conversation");
+    const memberWhere = {
+      OR: [{ starterId: user.id }, { recipientId: user.id }],
+    };
+    if (id) {
+      const conversation = await prisma.conversation.findFirst({
+        where: { id, ...memberWhere },
+      });
+      if (!conversation) throw new HttpError(404, "会话不存在。");
+      const before = params.get("before");
+      if (
+        before &&
+        !(await prisma.directMessage.findFirst({
+          where: { id: before, conversationId: id },
+        }))
+      )
+        throw new HttpError(400, "分页位置无效。");
+      const messages = await prisma.directMessage.findMany({
+        where: { conversationId: id },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 51,
+        ...(before ? { cursor: { id: before }, skip: 1 } : {}),
+      });
+      return json({
+        messages: messages.slice(0, 50).reverse(),
+        nextCursor: messages.length > 50 ? messages[49].id : null,
+      });
     }
-];
-
-export async function GET() {
-    try {
-        const session = await getSession();
-        if (!session) {
-            return NextResponse.json([]);
-        }
-
-        const count = await prisma.chatSession.count({
-            where: { userId: session.id }
-        });
-
-        if (count === 0) {
-            for (const testChat of TEST_MESSAGES) {
-                const chatSession = await prisma.chatSession.create({
-                    data: {
-                        userId: session.id,
-                        targetId: `test_${testChat.targetName.toLowerCase().replace(/\s+/g, '_')}`,
-                        targetType: testChat.targetType
-                    }
-                });
-
-                for (const msg of testChat.messages) {
-                    await prisma.chatMessage.create({
-                        data: {
-                            sessionId: chatSession.id,
-                            role: msg.role as 'user' | 'assistant',
-                            content: msg.content
-                        }
-                    });
-                }
-            }
-        }
-
-        const chatSessions = await prisma.chatSession.findMany({
-            where: {
-                userId: session.id
-            },
-            include: {
-                messages: {
-                    orderBy: { createdAt: 'desc' },
-                    take: 10
-                }
-            },
-            orderBy: { updatedAt: 'desc' }
-        });
-
-        return NextResponse.json(chatSessions);
-
-    } catch (error) {
-        console.error('Failed to fetch inbox:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    } finally {
-        await prisma.$disconnect();
-    }
+    const conversations = await prisma.conversation.findMany({
+      where: memberWhere,
+      take: 100,
+      orderBy: { updatedAt: "desc" },
+      include: {
+        starter: { select: { id: true, name: true } },
+        recipient: { select: { id: true, name: true } },
+        messages: { take: 1, orderBy: { createdAt: "desc" } },
+      },
+    });
+    return json(
+      conversations.map((c) => ({
+        id: c.id,
+        person: c.starterId === user.id ? c.recipient : c.starter,
+        lastMessage: c.messages[0]?.content || "",
+        updatedAt: c.updatedAt,
+      })),
+    );
+  } catch (error) {
+    return apiError(error);
+  }
 }
 
 export async function POST(request: Request) {
-    try {
-        const session = await getSession();
-        if (!session) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const { targetId, targetType, content } = await request.json();
-
-        if (!targetId || !targetType || !content) {
-            return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
-        }
-
-        let chatSession = await prisma.chatSession.findFirst({
-            where: {
-                userId: session.id,
-                targetId: targetId,
-                targetType: targetType
-            }
-        });
-
-        if (!chatSession) {
-            chatSession = await prisma.chatSession.create({
-                data: {
-                    userId: session.id,
-                    targetId: targetId,
-                    targetType: targetType
-                }
+  try {
+    sameOrigin(request);
+    const user = await requireSession();
+    const data = await readJson(
+      request,
+      z
+        .object({
+          conversationId: z.string().cuid().optional(),
+          targetId: z.string().cuid().optional(),
+          targetType: z.enum(["user", "project"]).optional(),
+          content: z.string().trim().min(1).max(4000),
+          requestId: z.string().uuid(),
+        })
+        .strict(),
+    );
+    await rateLimit(`message:${user.id}`, 30, 600);
+    let conversationId = data.conversationId;
+    if (conversationId) {
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          OR: [{ starterId: user.id }, { recipientId: user.id }],
+        },
+      });
+      if (!conversation) throw new HttpError(404, "会话不存在。");
+    } else {
+      if (!data.targetId || !data.targetType)
+        throw new HttpError(400, "请选择联系对象。");
+      const project =
+        data.targetType === "project"
+          ? await prisma.project.findFirst({
+              where: { id: data.targetId, published: true },
+              select: { ownerId: true, id: true },
+            })
+          : null;
+      const target =
+        data.targetType === "project"
+          ? project &&
+            (await prisma.user.findFirst({
+              where: { id: project.ownerId, ...memberWhere },
+              select: { id: true },
+            }))
+          : await prisma.user.findFirst({
+              where: {
+                id: data.targetId,
+                ...memberWhere,
+                profile: { published: true },
+              },
+              select: { id: true },
             });
-        }
-
-        const message = await prisma.chatMessage.create({
-            data: {
-                sessionId: chatSession.id,
-                role: 'user',
-                content: content
-            }
-        });
-
-        await prisma.chatSession.update({
-            where: { id: chatSession.id },
-            data: { updatedAt: new Date() }
-        });
-
-        return NextResponse.json({ success: true, message });
-
-    } catch (error) {
-        console.error('Failed to send message:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    } finally {
-        await prisma.$disconnect();
+      if (!target || target.id === user.id)
+        throw new HttpError(400, "该对象暂时无法联系。");
+      const threadKey = hashToken(
+        [...[user.id, target.id].sort(), project?.id || "direct"].join(":"),
+      );
+      const conversation = await prisma.conversation.upsert({
+        where: { threadKey },
+        create: {
+          threadKey,
+          starterId: user.id,
+          recipientId: target.id,
+          projectId: project?.id,
+        },
+        update: {},
+      });
+      conversationId = conversation.id;
     }
+    const existing = await prisma.directMessage.findUnique({
+      where: {
+        senderId_requestId: { senderId: user.id, requestId: data.requestId },
+      },
+    });
+    if (existing) {
+      if (
+        existing.conversationId !== conversationId ||
+        existing.content !== data.content
+      )
+        throw new HttpError(409, "请求标识已使用。");
+      return json({ message: existing, conversationId });
+    }
+    const message = await prisma.$transaction(async (tx) => {
+      const message = await tx.directMessage.create({
+        data: {
+          conversationId: conversationId!,
+          senderId: user.id,
+          content: data.content,
+          requestId: data.requestId,
+        },
+      });
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { updatedAt: new Date() },
+      });
+      return message;
+    });
+    return json({ message, conversationId }, 201);
+  } catch (error) {
+    return apiError(error);
+  }
 }

@@ -1,207 +1,73 @@
-/**
- * SecondMe OAuth 认证工具函数
- */
+import "server-only";
+import { cookies } from "next/headers";
+import { randomBytes } from "node:crypto";
+import { prisma } from "./db";
+import { hashToken } from "./rate-limit";
+import { HttpError } from "./http";
 
-import { cookies } from 'next/headers';
+export const sessionCookie = () =>
+  process.env.NODE_ENV === "production" ? "__Host-hub_session" : "hub_session";
+export const sessionDuration = 60 * 60 * 24 * 7;
+export const publicUser = {
+  id: true,
+  email: true,
+  username: true,
+  name: true,
+  avatar: true,
+  bio: true,
+} as const;
 
-const validateUrl = (url: string | undefined, name: string) => {
-    if (!url) return '';
-    url = url.replace(/[`'"]/g, '').trim();
-    if (!url.startsWith('http')) {
-        console.warn(`Environment variable ${name} does not look like a valid URL: ${url}`);
-        return '';
-    }
-    if (url === name) {
-        console.warn(`Environment variable ${name} has its own name as value! Check Vercel settings.`);
-        return '';
-    }
-    return url;
+// Both the new invitation accounts and previously verified email members are
+// eligible. Historical OAuth records do not silently gain membership.
+export const memberWhere = {
+  OR: [{ joinedAt: { not: null } }, { emailVerifiedAt: { not: null } }],
 };
 
-const getAuthConfig = () => ({
-    clientId: process.env.SECONDME_CLIENT_ID || '',
-    clientSecret: process.env.SECONDME_CLIENT_SECRET || '',
-    oauthUrl: validateUrl(process.env.SECONDME_OAUTH_URL, 'SECONDME_OAUTH_URL'),
-    tokenEndpoint: validateUrl(process.env.SECONDME_TOKEN_ENDPOINT, 'SECONDME_TOKEN_ENDPOINT'),
-    redirectUri: validateUrl(process.env.SECONDME_REDIRECT_URI, 'SECONDME_REDIRECT_URI'),
-});
-
-export interface SecondMeTokens {
-    accessToken: string;
-    refreshToken: string;
-    expiresAt: Date;
-}
-
-export function generateAuthUrl(): string {
-    const config = getAuthConfig();
-    const params = new URLSearchParams({
-        client_id: config.clientId,
-        redirect_uri: config.redirectUri,
-        response_type: 'code',
-        scope: 'user.info user.info.shades user.info.softmemory chat note.add',
-        state: Math.random().toString(36).substring(7),
-    });
-
-    return `${config.oauthUrl}?${params.toString()}`;
-}
-
-export async function exchangeCodeForTokens(code: string): Promise<SecondMeTokens> {
-    const config = getAuthConfig();
-    console.log('Exchanging code for tokens...');
-    console.log('Using redirect_uri:', config.redirectUri);
-
-    // 根据官方文档，正确的端点
-    // https://app.mindos.com/gate/lab/api/oauth/token/code
-    const tokenEndpoints = [
-        'https://app.mindos.com/gate/lab/api/oauth/token/code',
-        config.tokenEndpoint,
-    ];
-
-    let lastError: Error | null = null;
-
-    for (const endpoint of tokenEndpoints) {
-        console.log(`Trying token endpoint: ${endpoint}`);
-        
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    grant_type: 'authorization_code',
-                    code,
-                    client_id: config.clientId,
-                    client_secret: config.clientSecret,
-                    redirect_uri: config.redirectUri,
-                }),
-            });
-
-            console.log(`Response status: ${response.status}`);
-
-            if (response.ok) {
-                const json = await response.json();
-                console.log('Token response:', JSON.stringify(json));
-
-                const tokenData = json.data || json;
-                const accessToken = tokenData.accessToken || tokenData.access_token;
-                const refreshToken = tokenData.refreshToken || tokenData.refresh_token;
-
-                if (!accessToken) {
-                    throw new Error(`No access token received: ${JSON.stringify(json)}`);
-                }
-
-                const expiresAt = new Date();
-                expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
-
-                return {
-                    accessToken,
-                    refreshToken: refreshToken || '',
-                    expiresAt,
-                };
-            } else {
-                const errText = await response.text();
-                lastError = new Error(`Token exchange failed: ${response.status} ${errText}`);
-                console.error(`Failed with endpoint ${endpoint}:`, response.status, errText);
-            }
-        } catch (error) {
-            lastError = error instanceof Error ? error : new Error(String(error));
-            console.error(`Error with endpoint ${endpoint}:`, error);
-        }
-    }
-
-    throw lastError || new Error('All token endpoints failed');
-}
-
-export async function refreshAccessToken(refreshToken: string): Promise<SecondMeTokens> {
-    const config = getAuthConfig();
-    // 根据官方文档，刷新 Token 端点
-    // https://app.mindos.com/gate/lab/api/oauth/token/refresh
-    const response = await fetch('https://app.mindos.com/gate/lab/api/oauth/token/refresh', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: refreshToken,
-            client_id: config.clientId,
-            client_secret: config.clientSecret,
-        }),
-    });
-
-    if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Token refresh failed: ${response.status} ${errText}`);
-    }
-
-    const json = await response.json();
-    const tokenData = json.data || json;
-    const accessToken = tokenData.accessToken || tokenData.access_token;
-    const newRefreshToken = tokenData.refreshToken || tokenData.refresh_token || refreshToken;
-
-    const expiresAt = new Date();
-    expiresAt.setSeconds(expiresAt.getSeconds() + (tokenData.expiresIn || tokenData.expires_in || 7200));
-
-    return {
-        accessToken,
-        refreshToken: newRefreshToken,
-        expiresAt,
-    };
-}
-
 export async function getSession() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get('user_id')?.value;
+  const token = (await cookies()).get(sessionCookie())?.value;
+  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  const session = await prisma.authSession.findUnique({
+    where: { tokenHash: hashToken(token) },
+    include: { user: { select: publicUser } },
+  });
+  return session && !session.revokedAt && session.expiresAt > new Date()
+    ? session.user
+    : null;
+}
 
-    if (!userId) {
-        return null;
-    }
+export async function requireSession() {
+  const user = await getSession();
+  if (!user) throw new HttpError(401, "请先登录，再继续操作。");
+  return user;
+}
 
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
+export function newSessionToken() {
+  return randomBytes(32).toString("base64url");
+}
 
-    try {
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            include: {
-                profile: true,
-            },
-        });
-
-        if (!user) {
-            return null;
-        }
-
-        if (new Date() > user.tokenExpiresAt) {
-            try {
-                const newTokens = await refreshAccessToken(user.refreshToken);
-
-                await prisma.user.update({
-                    where: { id: user.id },
-                    data: {
-                        accessToken: newTokens.accessToken,
-                        refreshToken: newTokens.refreshToken,
-                        tokenExpiresAt: newTokens.expiresAt,
-                    },
-                });
-
-                user.accessToken = newTokens.accessToken;
-                user.refreshToken = newTokens.refreshToken;
-                user.tokenExpiresAt = newTokens.expiresAt;
-            } catch (error) {
-                console.error('Token refresh failed:', error);
-                return null;
-            }
-        }
-
-        return user;
-    } finally {
-        await prisma.$disconnect();
-    }
+export async function setSessionCookie(token: string) {
+  (await cookies()).set(sessionCookie(), token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: sessionDuration,
+  });
 }
 
 export async function logout() {
-    const cookieStore = await cookies();
-    cookieStore.delete('user_id');
+  const store = await cookies();
+  const token = store.get(sessionCookie())?.value;
+  if (token)
+    await prisma.authSession.updateMany({
+      where: { tokenHash: hashToken(token), revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  store.set(sessionCookie(), "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
 }

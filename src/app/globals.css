@@ -3,49 +3,131 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
   body {
-    @apply bg-paper-texture text-ink antialiased;
+    @apply bg-paper text-ink antialiased font-sans;
+    margin: 0;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  ::selection {
+    background: #dce4ff;
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  :focus-visible {
+    outline: 3px solid #8da3ff;
+    outline-offset: 4px;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  input,
+  textarea,
+  select {
+    min-width: 0;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    overflow-wrap: anywhere;
   }
 }
-
-@layer utilities {
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-sm font-semibold transition-colors;
+    min-height: 44px;
   }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+  .btn-primary {
+    @apply btn bg-accent-blue text-white hover:bg-[#2745DB];
+    box-shadow: 0 6px 16px -8px #3658f5;
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 rounded-full;
+  .btn-secondary {
+    @apply btn border border-border bg-white hover:border-ink/30;
   }
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400;
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-xl border border-transparent p-2.5 text-ink-light hover:bg-white hover:border-border;
+    min-width: 42px;
+    min-height: 42px;
+  }
+  .field {
+    @apply w-full rounded-xl border border-border bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-accent-blue;
+  }
+  .eyebrow {
+    @apply text-[11px] font-mono uppercase tracking-[0.16em] text-ink-light;
+  }
+  .surface {
+    @apply rounded-2xl border border-border bg-white;
+  }
+  .page-container {
+    @apply mx-auto w-full max-w-[1240px] px-5 md:px-10;
+  }
+  .notice {
+    @apply rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm leading-relaxed text-blue-900;
+  }
+  .error-notice {
+    @apply rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-800;
+  }
+  .nav-link {
+    @apply flex items-center gap-2 rounded-full px-3 py-2 text-sm text-ink-light transition-colors hover:text-ink;
+  }
+  .nav-active {
+    @apply bg-white text-ink shadow-sm;
   }
 }
-
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #d4dce1;
+  border-radius: 5px;
+}
 .animate-in {
-  animation-duration: 300ms;
-  animation-fill-mode: both;
+  animation: reveal 0.35s ease both;
 }
-.fade-in {
-  animation-name: fadeIn;
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
-.slide-in-from-bottom-4 {
-  animation-name: slideInFromBottom;
+.network-orbit {
+  animation: orbit 60s linear infinite;
+  transform-origin: 280px 235px;
 }
-.zoom-in-95 {
-  animation-name: zoomIn;
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
 }
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes slideInFromBottom {
-  from { transform: translateY(1rem); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-@keyframes zoomIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
 }
