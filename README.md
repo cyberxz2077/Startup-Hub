@@ -2,11 +2,13 @@
 
 让想法遇见共建的人。为创业者和建设者整理项目、个人能力与合作意向，通过 AI 辅助匹配和站内消息建立连接。
 
+正式站点：[Startup Hub](https://startup-hub-woad.vercel.app/)。
+
 当前版本 `0.2.0`：Next.js 15 / React 19 / Prisma 6 / PostgreSQL，通用邀请码注册、用户名与密码登录，服务端 DeepSeek API。Supabase 负责数据库，Vercel 负责网站运行。
 
 ## 开始开发
 
-要求 Node.js 22.12+（部署建议使用 22 LTS）和 PostgreSQL。首次安装：
+要求 Node.js 22 LTS（项目固定 22.x）和 PostgreSQL。首次安装：
 
 ```bash
 npm ci
