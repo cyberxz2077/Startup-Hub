@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   ArrowLeft,
   Check,
@@ -73,12 +74,14 @@ export function Onboarding({
   projectId,
   draftKey = "new",
   onBack,
+  onSwitch,
 }: {
   mode: "project" | "profile";
   userId: string;
   projectId?: string;
   draftKey?: string;
   onBack: () => void;
+  onSwitch: () => void;
 }) {
   const initial = mode === "project" ? initialProjectData : initialProfileData;
   const labels = mode === "project" ? projectLabels : profileLabels;
@@ -420,16 +423,47 @@ export function Onboarding({
         </div>
       </div>
       <div className="page-container py-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-white px-4 py-3">
+          <p className="text-xs text-ink-light leading-6">
+            {mode === "project"
+              ? "项目与个人档案都属于你，可以随时切换完善。"
+              : "展示你的能力，也可以同时发起自己的项目。"}
+          </p>
+          <button
+            type="button"
+            disabled={loading || saving}
+            onClick={onSwitch}
+            className="text-xs font-semibold text-accent-blue flex items-center gap-1.5 py-1"
+          >
+            {mode === "project" ? "完善我的个人档案" : "继续我的项目"}
+            <ArrowUpRight size={15} />
+          </button>
+        </div>
         {error && (
           <p role="alert" className="error-notice">
             {error}
           </p>
         )}
         {notice && (
-          <p role="status" className="notice flex items-center gap-2">
+          <div
+            role="status"
+            className="notice flex flex-wrap items-center gap-2"
+          >
             <Check size={16} className="shrink-0" />
-            {notice}
-          </p>
+            <span>{notice}</span>
+            {published && (
+              <Link
+                className="ml-auto text-xs font-semibold underline underline-offset-4"
+                href={
+                  mode === "project"
+                    ? `/?view=project_detail&id=${id}`
+                    : `/?view=profile_detail&id=${userId}`
+                }
+              >
+                查看公开页面
+              </Link>
+            )}
+          </div>
         )}
         <div className="lg:hidden flex gap-2">
           <button

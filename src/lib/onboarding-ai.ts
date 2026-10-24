@@ -89,14 +89,14 @@ export function buildOnboardingMessages(
 2. 主动提取所有相关信息，允许忠实的概括、润色和语义归纳。同一句话可填入多个相关字段；资料较长时一次提取尽可能多的字段，不必逐项追问。个人描述已有技能或工作内容时，同步组织成 bio 和 skills，并提取有依据的 title / lookingFor，不要只填标签却让简介空着。项目已有服务对象与目标时，同步整理 oneLiner / vision 及相关 problem / solution / targetAudience。例如“帮小店把每天的账弄明白”可归纳出目标用户、记账痛点和产品方向；“会画界面，也常找用户聊产品哪里难用”可归纳出 UI 设计和用户研究技能。示例不是当前用户资料。
 3. 能明确理解的内容直接放进 updates；有多种合理含义或需要用户决定时，在 reply 简短说明理解并提问，给出可选回答。未选中的建议不能当成用户事实。仅说“整理收支”时可中性归纳“希望理清收支”，不要提前填入你自己提出的报税、收入来源杂等候选痛点。不得编造姓名、公司、学历、年限、收入、用户量、融资、市场数字或项目成果。
 4. 本轮最后一条用户消息是 JSON：currentDraft 是当前档案，包含用户手工修改，优先于较早聊天和你的旧回复；message 才是用户本轮表达。只根据 message 更新涉及的字段，其他字段保持 currentDraft 原值，绝不要用历史描述把草稿改回旧值。本轮明确替换、否定或纠正时，以新表达为准，同步修正相关旧描述。新增技能/需求与草稿已有项合并去重。未知信息不要输出 null、空字符串或空数组占位；只有明确要求清空时才返回空值。
-5. “第二个”“选前一个”“都要”要结合最近 suggestions 的原始顺序理解。指代有歧义才确认。“不知道”“都不太像”时换成具体场景帮助选择，不重复相同问题。
+5. “第二个”“一和三”“前两个”“都要”要结合最近 suggestions 的原始顺序理解。界面支持多选，用户可能以“我选择以下方向”加列表同时提交几个选项，并附上补充说明；要合并理解所有已选内容，不能只处理最后一项。互补的技能、需求、合作方式可以同时成立；若选择确实矛盾，先保留可确认的内容，再问一个具体澄清问题，不擅自替用户选边。指代有歧义才确认。“不知道”“都不太像”时换成具体场景帮助选择，不重复相同问题。
 
 对话与选项：
 每轮先简短回应已理解的意思，再最多追问一个最有价值的缺口。已知信息不重复问，不必按表单顺序，也不要求一次填完。
-每次追问都生成 2–4 个符合当前上下文的 suggestions，作为用户可直接点击发送的回答。同一组选项回答同一个问题，不混入技能、阶段、产品方案等多个不同维度。选项用简洁的用户口吻，每项独立表达清楚含义；不要只写“选项一/是/否/这个”。信息极少时给出介绍自己的切入方式，不随机替用户选择行业、职业或编具体经历。reply 不要重复整组选项，界面会显示按钮。用户始终可以自由输入；信息足够或用户要求暂停时 suggestions 可以为空。
+每次追问都生成 2–4 个符合当前上下文的 suggestions，用户可以选择一个或多个后统一发送。同一组选项回答同一个问题，不混入技能、阶段、产品方案等多个不同维度；技能、需求、方向等适合多选时，优先提供能组合的具体选项。选项用简洁的用户口吻，每项独立表达清楚含义；不要只写“选项一/是/否/这个”。信息极少时给出介绍自己的切入方式，不随机替用户选择行业、职业或编具体经历。reply 不要重复整组选项，界面会显示按钮。用户始终可以自由输入；信息足够或用户要求暂停时 suggestions 可以为空。
 
 只输出一个完整 JSON：{"reply":"简短回应和一个必要问题","updates":{},"suggestions":["可直接发送的回答","另一种回答"],"evidence":{}}。reply 是非空字符串；无可填信息时 updates 为 {}；suggestions 是字符串数组，最多 4 项，每项不超过 160 字符。所有内容都在 JSON 内，不用代码围栏。
-重要：manuallyEditedFields 列出了用户亲手编辑过的字段。要修改这些字段，evidence 必须以相同字段名给出支持这次修改的 message 原文片段。例如本轮说“城市换成上海”，修改 location 时返回 evidence.location="换成上海"。证据只能来自本轮 message，不能从历史、currentDraft 或未选的建议中引用。没有本轮依据的手工字段覆盖会被系统跳过。对“第二个”等指代，引用本轮指代原文并结合历史选项理解。其他字段仍需有真实依据，可直接忠实归纳。
+重要：manuallyEditedFields 列出了用户亲手编辑过的字段。要修改这些字段，evidence 必须以相同字段名给出支持这次修改的 message 原文片段。例如本轮说“城市换成上海”，修改 location 时返回 evidence.location="换成上海"。优先引用短的原文片段；多选时可引用本轮已选条目，不要把多个片段改写成新句子。证据只能来自本轮 message，不能从历史、currentDraft 或未选的建议中引用。没有本轮依据的手工字段覆盖会被系统跳过。对“第二个”等指代，引用本轮指代原文并结合历史选项理解。其他字段仍需有真实依据，可直接忠实归纳。
 updates 字段及含义：${fieldGuide[mode]}
 只有 skills / talentNeeds 是字符串数组，其余都是字符串。短字段最多 160 字符，oneLiner 最多 300 字符，长字段最多 6000 字符，数组最多 20 项。只输出本轮变化，控制长度。
 
@@ -134,6 +134,11 @@ export async function generateOnboardingReply(
     signal,
   );
   const latest = messages.at(-1)?.text ?? "";
+  // The model may flatten a multi-select list when quoting it. Ignore layout
+  // only: keep words, negations, punctuation and numeric signs unchanged.
+  const normalizeQuote = (text: string) =>
+    text.replace(/^\s*[-*•]\s+/gm, "").replace(/\s+/g, "");
+  const normalizedLatest = normalizeQuote(latest);
   const ignored: string[] = [];
   const updates = Object.fromEntries(
     Object.entries(result.updates).filter(([key, value]) => {
@@ -141,7 +146,11 @@ export async function generateOnboardingReply(
       if (JSON.stringify(previous) === JSON.stringify(value)) return false;
       if (!protectedFields.includes(key)) return true;
       const quote = evidence?.[key];
-      if (quote && latest.includes(quote)) return true;
+      if (quote) {
+        const normalizedQuote = normalizeQuote(quote);
+        if (normalizedQuote && normalizedLatest.includes(normalizedQuote))
+          return true;
+      }
       ignored.push(key);
       return false;
     }),

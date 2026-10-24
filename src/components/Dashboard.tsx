@@ -11,7 +11,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { api, errorText } from "@/lib/client";
-import { ProjectWithMeta } from "./ProjectShowcase";
+import type { ProfileData, ProjectWithMeta } from "@/types";
 import { ContactDialog, ContactTarget } from "./ContactDialog";
 import { useRouter } from "next/navigation";
 type Match = ContactTarget & {
@@ -23,11 +23,20 @@ type Match = ContactTarget & {
 };
 export function Dashboard({
   onNavigate,
+  userId,
+  onContinueProject,
+  hasProjectDraft,
 }: {
   onNavigate: (view: string) => void;
+  userId: string;
+  onContinueProject: () => void;
+  hasProjectDraft: boolean;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectWithMeta[]>([]);
+  const [profile, setProfile] = useState<
+    (ProfileData & { published: boolean }) | null
+  >(null);
   const [matches, setMatches] = useState<Match[] | null>(null);
   const [source, setSource] = useState("profile");
   const [loading, setLoading] = useState(true);
@@ -37,10 +46,31 @@ export function Dashboard({
   const [contact, setContact] = useState<ContactTarget | null>(null);
   const lock = useRef(false);
   useEffect(() => {
-    api<ProjectWithMeta[]>("/api/projects?mine=true")
-      .then(setProjects)
-      .catch((e) => setError(errorText(e)))
-      .finally(() => setLoading(false));
+    const controller = new AbortController();
+    Promise.all([
+      api<ProjectWithMeta[]>(
+        "/api/projects?mine=true",
+        undefined,
+        controller.signal,
+      ),
+      api<ProfileData & { published: boolean }>(
+        "/api/profiles",
+        undefined,
+        controller.signal,
+      ),
+    ])
+      .then(([records, personal]) => {
+        setProjects(records);
+        setProfile(personal);
+        if (!personal.title && records.length) setSource(records[0].id);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(errorText(e));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, []);
   const match = async () => {
     if (lock.current) return;
@@ -86,6 +116,84 @@ export function Dashboard({
           {error}
         </p>
       )}
+      <div className="grid md:grid-cols-2 gap-5 mb-8">
+        <section className="surface p-6 md:p-7">
+          <div className="flex items-center justify-between mb-5">
+            <Fingerprint
+              size={27}
+              strokeWidth={1.5}
+              className="text-accent-blue"
+            />
+            <span className="text-xs text-ink-light">
+              {loading
+                ? "加载中…"
+                : profile?.published
+                  ? "已在用户库公开"
+                  : profile?.title
+                    ? "私密草稿"
+                    : "待完善"}
+            </span>
+          </div>
+          <h2 className="text-xl font-semibold">我的个人档案</h2>
+          <p className="mt-3 mb-5 text-sm leading-7 text-ink-light">
+            让伙伴了解你的经历、能力和合作意向。发起项目之后，也可以继续完善自己。
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => onNavigate("profile_create")}
+              className="btn-primary"
+            >
+              <Pencil size={15} />
+              {profile?.title ? "编辑个人档案" : "完善个人档案"}
+            </button>
+            {profile?.published && (
+              <Link
+                className="btn-secondary"
+                href={`/?view=profile_detail&id=${userId}`}
+              >
+                查看公开档案
+                <ArrowUpRight size={15} />
+              </Link>
+            )}
+          </div>
+        </section>
+        <section className="surface p-6 md:p-7">
+          <div className="flex items-center justify-between mb-5">
+            <FolderOpen
+              size={27}
+              strokeWidth={1.5}
+              className="text-accent-blue"
+            />
+            <span className="text-xs text-ink-light">
+              {loading ? "加载中…" : `${projects.length} 个已保存项目`}
+            </span>
+          </div>
+          <h2 className="text-xl font-semibold">我的项目</h2>
+          <p className="mt-3 mb-5 text-sm leading-7 text-ink-light">
+            整理正在推进的想法。公开项目会展示在项目库，并关联到你的公开个人档案。
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {hasProjectDraft ? (
+              <button className="btn-primary" onClick={onContinueProject}>
+                继续上次的项目
+                <ArrowUpRight size={15} />
+              </button>
+            ) : (
+              <button
+                className="btn-primary"
+                onClick={() => onNavigate("project_create")}
+              >
+                <Plus size={15} />
+                建立项目档案
+              </button>
+            )}
+            <Link className="btn-secondary" href="/?view=people_showcase">
+              去用户库找伙伴
+              <ArrowUpRight size={15} />
+            </Link>
+          </div>
+        </section>
+      </div>
       <div className="grid lg:grid-cols-[1fr_340px] gap-6 items-start">
         <div className="space-y-6">
           <section className="surface p-6 md:p-8">
@@ -159,7 +267,12 @@ export function Dashboard({
                           <span className="text-[9px]">资料契合度</span>
                         </div>
                         <div>
-                          <h3 className="font-semibold text-xl">{m.name}</h3>
+                          <Link
+                            className="font-semibold text-xl hover:text-accent-blue"
+                            href={`/?view=${m.targetType === "user" ? "profile_detail" : "project_detail"}&id=${m.targetId}`}
+                          >
+                            {m.name}
+                          </Link>
                           <p className="text-xs text-ink-light mt-1">
                             {m.label}
                           </p>
@@ -201,23 +314,6 @@ export function Dashboard({
           )}
         </div>
         <aside className="space-y-5">
-          <button
-            onClick={() => onNavigate("profile_create")}
-            className="surface p-6 text-left w-full hover:border-accent-blue transition-colors"
-          >
-            <Fingerprint
-              size={26}
-              className="text-accent-blue mb-5"
-              strokeWidth={1.5}
-            />
-            <div className="flex items-center justify-between">
-              <h2 className="font-semibold">我的个人档案</h2>
-              <ArrowUpRight size={17} />
-            </div>
-            <p className="text-xs text-ink-light leading-6 mt-2">
-              更新经历、技能与合作意向。
-            </p>
-          </button>
           <section className="surface p-6">
             <h2 className="font-semibold mb-5 flex items-center gap-2">
               <FolderOpen size={17} className="text-accent-blue" />
@@ -232,19 +328,40 @@ export function Dashboard({
             ) : (
               <div className="space-y-4">
                 {projects.map((p) => (
-                  <Link
+                  <div
                     key={p.id}
-                    href={`/?view=project_create&id=${p.id}`}
                     className="flex justify-between gap-3 items-center border-t border-border pt-4 first:border-0 first:pt-0"
                   >
                     <div>
-                      <p className="text-sm font-medium">{p.name}</p>
+                      <Link
+                        href={`/?view=project_create&id=${p.id}`}
+                        className="text-sm font-medium hover:text-accent-blue"
+                      >
+                        {p.name}
+                      </Link>
                       <p className="text-[10px] text-ink-light mt-1">
                         {p.published ? "公开项目" : "私密草稿"}
                       </p>
                     </div>
-                    <Pencil size={14} className="text-ink-light shrink-0" />
-                  </Link>
+                    <div className="flex gap-1">
+                      <Link
+                        href={`/?view=project_create&id=${p.id}`}
+                        className="icon-btn"
+                        aria-label={`编辑项目 ${p.name}`}
+                      >
+                        <Pencil size={14} />
+                      </Link>
+                      {p.published && (
+                        <Link
+                          href={`/?view=project_detail&id=${p.id}`}
+                          className="icon-btn"
+                          aria-label={`查看公开项目 ${p.name}`}
+                        >
+                          <ArrowUpRight size={15} />
+                        </Link>
+                      )}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

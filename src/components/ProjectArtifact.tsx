@@ -1,6 +1,13 @@
 import { ProjectData } from "@/types";
 import { MapPin, Users, Target } from "lucide-react";
-export function ProjectArtifact({ data }: { data: ProjectData }) {
+export function ProjectArtifact({
+  data,
+  headingLevel = 2,
+}: {
+  data: ProjectData;
+  headingLevel?: 1 | 2;
+}) {
+  const Heading = headingLevel === 1 ? "h1" : "h2";
   const details: [keyof ProjectData, string][] = [
     ["vision", "项目愿景"],
     ["problem", "要解决的问题"],
@@ -20,13 +27,13 @@ export function ProjectArtifact({ data }: { data: ProjectData }) {
     <article className="surface p-6 md:p-9">
       <div className="border-b border-border pb-7 mb-7">
         <p className="eyebrow mb-5">PROJECT / {data.sector || "EXPLORING"}</p>
-        <h2 className="text-3xl md:text-4xl font-semibold tracking-tight">
+        <Heading className="text-3xl md:text-4xl font-semibold tracking-tight break-words">
           {data.name || "一个新想法"}
-        </h2>
+        </Heading>
         <p className="text-base text-ink-light mt-4 leading-7">
           {data.oneLiner || "用一句话介绍你正在做的事。"}
         </p>
-        <div className="flex gap-4 mt-5 text-xs text-ink-light">
+        <div className="flex flex-wrap gap-4 mt-5 text-xs text-ink-light">
           <span className="flex items-center gap-1">
             <MapPin size={13} />
             {data.location || "地点待补充"}

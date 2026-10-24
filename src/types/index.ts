@@ -40,6 +40,29 @@ export interface Message {
   suggestions?: string[];
 }
 
+export type ProjectWithMeta = ProjectData & {
+  id: string;
+  ownerId: string;
+  published: boolean;
+  owner: {
+    name: string | null;
+    avatar: string | null;
+    profilePublished: boolean;
+  };
+};
+
+export type PublicProjectSummary = Pick<
+  ProjectData,
+  "name" | "oneLiner" | "sector" | "stage"
+> & { id: string };
+
+export type PublicProfile = ProfileData & {
+  userId: string;
+  updatedAt: string;
+  projects: PublicProjectSummary[];
+  projectCount: number;
+};
+
 export interface Attachment {
   name: string;
   data: string;

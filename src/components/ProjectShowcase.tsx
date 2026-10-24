@@ -1,45 +1,23 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
   Search,
   MapPin,
   ArrowUpRight,
   Plus,
-  X,
   Layers3,
   Loader2,
 } from "lucide-react";
-import { ProjectData } from "@/types";
+import type { ProjectWithMeta } from "@/types";
 import { api, errorText } from "@/lib/client";
-import { ProjectArtifact } from "./ProjectArtifact";
-import { Modal } from "./ui/Modal";
-import { ContactDialog, ContactTarget } from "./ContactDialog";
-export type ProjectWithMeta = ProjectData & {
-  id: string;
-  ownerId: string;
-  published: boolean;
-  owner: { name: string | null; avatar: string | null };
-};
-export function ProjectShowcase({
-  onCreate,
-  onContact,
-  onLogin,
-  isLoggedIn,
-  userId,
-}: {
-  onCreate: () => void;
-  onContact: (id: string) => void;
-  onLogin: () => void;
-  isLoggedIn: boolean;
-  userId?: string;
-}) {
+export type { ProjectWithMeta } from "@/types";
+export function ProjectShowcase({ onCreate }: { onCreate: () => void }) {
   const [projects, setProjects] = useState<ProjectWithMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState("全部");
-  const [selected, setSelected] = useState<ProjectWithMeta | null>(null);
-  const [contact, setContact] = useState<ContactTarget | null>(null);
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -165,9 +143,9 @@ export function ProjectShowcase({
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
             {filtered.map((p) => (
-              <button
+              <Link
                 key={p.id}
-                onClick={() => setSelected(p)}
+                href={`/?view=project_detail&id=${p.id}`}
                 className="surface p-6 text-left flex flex-col group hover:border-accent-blue/50 transition-colors min-h-[300px]"
               >
                 <div className="flex items-center justify-between mb-7">
@@ -200,58 +178,10 @@ export function ProjectShowcase({
                     {p.location || "地点待补充"}
                   </span>
                 </div>
-              </button>
+              </Link>
             ))}
           </div>
         </>
-      )}
-      {selected && (
-        <Modal wide title={selected.name} onClose={() => setSelected(null)}>
-          <div className="flex justify-between items-center mb-5">
-            <p className="eyebrow">PROJECT DETAILS</p>
-            <button
-              className="icon-btn"
-              aria-label="关闭项目详情"
-              onClick={() => setSelected(null)}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <ProjectArtifact data={selected} />
-          <div className="mt-5 flex justify-end">
-            <button
-              disabled={userId === selected.ownerId}
-              className="btn-primary"
-              onClick={() => {
-                if (!isLoggedIn) {
-                  setSelected(null);
-                  onLogin();
-                } else {
-                  setContact({
-                    targetId: selected.id,
-                    targetType: "project",
-                    name: selected.name,
-                  });
-                  setSelected(null);
-                }
-              }}
-            >
-              {userId === selected.ownerId
-                ? "这是你的项目"
-                : isLoggedIn
-                  ? "与发起人聊聊"
-                  : "登录后联系"}
-              <ArrowUpRight size={16} />
-            </button>
-          </div>
-        </Modal>
-      )}
-      {contact && (
-        <ContactDialog
-          target={contact}
-          onClose={() => setContact(null)}
-          onSent={onContact}
-        />
       )}
     </section>
   );

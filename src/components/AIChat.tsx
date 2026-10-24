@@ -7,8 +7,10 @@ import {
   X,
   ArrowUp,
   RotateCcw,
+  Check,
 } from "lucide-react";
 import { Message, Attachment } from "@/types";
+import { composeChatMessage } from "@/lib/chat-composer";
 
 export function AIChat({
   messages,
@@ -29,9 +31,18 @@ export function AIChat({
   const [input, setInput] = useState("");
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [fileError, setFileError] = useState("");
+  const [selection, setSelection] = useState<{
+    question: string;
+    values: string[];
+  }>({ question: "", values: [] });
+  const last = messages.at(-1);
+  const question =
+    last?.role === "model"
+      ? JSON.stringify([messages.length, last.text, last.suggestions])
+      : "";
+  const selected = selection.question === question ? selection.values : [];
   const end = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const textInput = useRef<HTMLTextAreaElement>(null);
   const sending = useRef(false);
   useEffect(() => {
     end.current?.scrollIntoView({
@@ -41,7 +52,10 @@ export function AIChat({
       block: "nearest",
     });
   }, [messages, loading]);
-  const send = async (text = input.trim()) => {
+  const send = async () => {
+    const sentInput = input.trim();
+    const sentQuestion = question;
+    const text = composeChatMessage(sentInput, selected);
     if ((!text && !attachment) || loading || sending.current) return;
     sending.current = true;
     setFileError("");
@@ -50,7 +64,12 @@ export function AIChat({
       const sent = await onSendMessage(text, sentAttachment);
       if (sent) {
         // Preserve anything the user starts writing while the response is pending.
-        setInput((current) => (current.trim() === text ? "" : current));
+        setInput((current) => (current.trim() === sentInput ? "" : current));
+        setSelection((current) =>
+          current.question === sentQuestion
+            ? { question: "", values: [] }
+            : current,
+        );
         setAttachment((current) =>
           current === sentAttachment ? null : current,
         );
@@ -62,16 +81,18 @@ export function AIChat({
   };
   const choose = (suggestion: string) => {
     if (loading || sending.current) return;
-    if (input.trim() || attachment) {
-      setInput((current) =>
-        current.trim() ? `${current}\n${suggestion}` : suggestion,
-      );
-      textInput.current?.focus();
-      return;
-    }
-    // Keep the selected answer in the composer if this request fails.
-    setInput(suggestion);
-    void send(suggestion);
+    setSelection((current) => {
+      const values = current.question === question ? current.values : [];
+      const next = values.includes(suggestion)
+        ? values.filter((value) => value !== suggestion)
+        : [...values, suggestion];
+      return {
+        question,
+        values: (last?.suggestions || []).filter((value) =>
+          next.includes(value),
+        ),
+      };
+    });
   };
   const readFile = async (file?: File) => {
     setFileError("");
@@ -135,8 +156,9 @@ export function AIChat({
                         key={`${index}:${suggestion}`}
                         type="button"
                         disabled={loading}
+                        aria-pressed={selected.includes(suggestion)}
                         onClick={() => choose(suggestion)}
-                        className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 text-left text-xs leading-5 text-ink transition-colors hover:border-accent-blue hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-blue disabled:opacity-50"
+                        className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 text-left text-xs leading-5 text-ink transition-colors hover:border-accent-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-blue disabled:opacity-50 ${selected.includes(suggestion) ? "border-accent-blue bg-blue-50" : "border-blue-100 bg-blue-50/50"}`}
                       >
                         <span
                           aria-hidden="true"
@@ -147,14 +169,31 @@ export function AIChat({
                         <span className="min-w-0 break-words">
                           {suggestion}
                         </span>
+                        <span
+                          aria-hidden="true"
+                          className={`ml-auto mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selected.includes(suggestion) ? "border-accent-blue bg-accent-blue text-white" : "border-blue-200 bg-white"}`}
+                        >
+                          {selected.includes(suggestion) && <Check size={12} />}
+                        </span>
                       </button>
                     ))}
                   </div>
                   <p className="mt-2 text-[10px] leading-5 text-ink-light">
-                    {input.trim() || attachment
-                      ? "选择会补充到输入框，发送前可以修改。"
-                      : "点击选择，也可以直接输入自己的想法。"}
+                    可多选，再点一次取消。选好后统一发送，也可以在下方补充。
                   </p>
+                  {selected.length > 0 && (
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => void send()}
+                      className="btn-primary mt-3 !py-2 !text-xs w-full"
+                    >
+                      <ArrowUp size={15} />
+                      {input.trim() || attachment
+                        ? `发送选择与补充（${selected.length}）`
+                        : `发送所选（${selected.length}）`}
+                    </button>
+                  )}
                 </div>
               )}
           </div>
@@ -200,7 +239,6 @@ export function AIChat({
           </label>
           <textarea
             id="ai-input"
-            ref={textInput}
             value={input}
             maxLength={4000}
             onChange={(e) => setInput(e.target.value)}
@@ -242,7 +280,9 @@ export function AIChat({
             </span>
             <button
               className="rounded-xl bg-accent-blue text-white p-2.5"
-              disabled={loading || (!input.trim() && !attachment)}
+              disabled={
+                loading || (!input.trim() && !attachment && !selected.length)
+              }
               aria-label={error ? "重试发送" : "发送消息"}
             >
               {loading ? (

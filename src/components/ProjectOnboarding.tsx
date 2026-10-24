@@ -4,6 +4,7 @@ export function ProjectOnboarding(props: {
   projectId?: string;
   draftKey?: string;
   onBack: () => void;
+  onSwitch: () => void;
 }) {
   return <Onboarding {...props} mode="project" />;
 }

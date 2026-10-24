@@ -4,6 +4,7 @@ import { requireSession } from "@/lib/auth";
 import { apiError, json, readJson, sameOrigin, HttpError } from "@/lib/http";
 import { projectSchema, stringList, textValue } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
+import { publicProjectOwnerSelect } from "@/lib/public-profiles";
 
 export async function GET(request: Request) {
   try {
@@ -14,11 +15,16 @@ export async function GET(request: Request) {
       where: mine ? { ownerId: user!.id } : { published: true },
       orderBy: { updatedAt: "desc" },
       take: 100,
-      include: { owner: { select: { name: true, avatar: true } } },
+      include: { owner: { select: publicProjectOwnerSelect } },
     });
     return json(
       projects.map((p) => ({
         ...p,
+        owner: {
+          name: p.owner.name,
+          avatar: p.owner.avatar,
+          profilePublished: !!p.owner.profile?.published,
+        },
         talentNeeds: stringList(p.talentNeeds),
         others: textValue(p.others),
       })),

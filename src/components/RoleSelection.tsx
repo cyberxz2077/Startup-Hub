@@ -11,7 +11,7 @@ export const RoleSelectionPage = ({
         这次，从哪里开始？
       </h1>
       <p className="text-ink-light leading-7 mb-10">
-        一个清晰的介绍，让对的人更容易看见你。两种身份可以同时拥有。
+        先选一项开始即可。个人档案和项目可以同时拥有，之后随时在工作台或编辑页切换完善。
       </p>
       <div className="grid md:grid-cols-2 gap-5">
         {[

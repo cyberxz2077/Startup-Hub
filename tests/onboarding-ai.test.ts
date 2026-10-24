@@ -175,6 +175,47 @@ describe("onboarding conversation contract", () => {
 });
 
 describe("recovering model output without losing the conversation", () => {
+  it("accepts a layout-only rewrite of selected evidence while still rejecting stale manual-field changes", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        completion({
+          reply: "早期团队和成熟产品都可以，远程按项目合作。",
+          updates: {
+            lookingFor: "远程按项目合作，早期团队和成熟产品都可以",
+            location: "深圳",
+          },
+          evidence: {
+            lookingFor:
+              "我选择以下方向：我偏向早期团队 我也考虑成熟产品 补充：只做远程，按项目合作",
+            location: "我在深圳",
+          },
+        }),
+      ),
+    );
+    const result = await generateOnboardingReply(
+      "profile",
+      [
+        { role: "user", text: "我在深圳" },
+        {
+          role: "model",
+          text: "想与什么样的团队合作？",
+          suggestions: ["我偏向早期团队", "我也考虑成熟产品"],
+        },
+        {
+          role: "user",
+          text: "我选择以下方向：\n- 我偏向早期团队\n- 我也考虑成熟产品\n\n补充：只做远程，按项目合作",
+        },
+      ],
+      { ...initialProfileData, lookingFor: "远程按项目合作", location: "上海" },
+      undefined,
+      ["lookingFor", "location"],
+    );
+    expect(result.updates).toEqual({
+      lookingFor: "远程按项目合作，早期团队和成熟产品都可以",
+    });
+  });
+
   it("keeps existing fields when a model cites stale history or omits current evidence", async () => {
     vi.stubGlobal(
       "fetch",
