@@ -77,6 +77,7 @@ const request = (path: string, data: unknown) =>
     headers: {
       Origin: "http://localhost:3100",
       "Content-Type": "application/json",
+      "x-vercel-forwarded-for": `2001:db8:${run.slice(0, 4)}:${run.slice(4)}::1`,
     },
     body: JSON.stringify(data),
   });
@@ -87,6 +88,8 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)(
     beforeAll(() => {
       vi.stubEnv("APP_URL", "http://localhost:3100");
       vi.stubEnv("REGISTRATION_INVITE_CODE", "2077");
+      // Keep repeat runs independent without resetting the preserved test DB.
+      vi.stubEnv("VERCEL", "1");
     });
     afterAll(async () => {
       vi.unstubAllEnvs();

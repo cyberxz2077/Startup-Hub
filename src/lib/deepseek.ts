@@ -3,7 +3,35 @@ import { z } from "zod";
 import { HttpError } from "./http";
 import { matchResultSchema } from "./validation";
 
-type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+export type ChatMessage = {
+  role: "system" | "user" | "assistant";
+  content: string;
+};
+
+const completionSchema = z.object({
+  choices: z
+    .array(
+      z.object({
+        finish_reason: z.string(),
+        message: z.object({ content: z.string().nullable() }),
+      }),
+    )
+    .min(1),
+});
+
+type OutputFailure =
+  "response" | "truncated" | "interrupted" | "empty" | "json" | "schema";
+
+class InvalidOutput extends Error {
+  constructor(
+    public reason: OutputFailure,
+    public issueCodes: string[] = [],
+  ) {
+    super(reason);
+  }
+}
+
+const repairInstruction = `上一次输出未通过格式校验，请重新生成完整且简洁的 JSON，遵循原任务的字段类型与长度要求。仅返回本轮必要的字段，数组字段必须是字符串数组，不要用 null 表示未知信息，不要输出代码围栏或 JSON 以外的文本。不要增加未经用户确认的事实。`;
 
 export async function deepseekJson<T extends z.ZodTypeAny>(
   messages: ChatMessage[],
@@ -18,49 +46,99 @@ export async function deepseekJson<T extends z.ZodTypeAny>(
   ).replace(/\/$/, "");
   if (!base.startsWith("https://"))
     throw new HttpError(503, "AI 服务配置有误。");
-  let response: Response;
-  try {
-    response = await fetch(`${base}/chat/completions`, {
-      method: "POST",
-      cache: "no-store",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
-        messages,
-        response_format: { type: "json_object" },
-        thinking: { type: "disabled" },
-        max_tokens: 4096,
-        stream: false,
-      }),
-      signal: signal
-        ? AbortSignal.any([signal, AbortSignal.timeout(45000)])
-        : AbortSignal.timeout(45000),
-    });
-  } catch {
-    throw new HttpError(504, "AI 响应超时，请稍后重试。你的草稿仍然保留。");
+  // One deadline for both attempts, leaving time for the route to return on Vercel.
+  const timeout = AbortSignal.timeout(45000);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const requestMessages =
+      attempt === 0
+        ? messages
+        : [
+            ...messages,
+            { role: "system" as const, content: repairInstruction },
+          ];
+    let response: Response;
+    try {
+      requestSignal.throwIfAborted();
+      response = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.DEEPSEEK_MODEL || "deepseek-flash",
+          messages: requestMessages,
+          response_format: { type: "json_object" },
+          thinking: { type: "disabled" },
+          temperature: 0.3,
+          max_tokens: 4096,
+          stream: false,
+        }),
+        signal: requestSignal,
+      });
+    } catch {
+      throw new HttpError(
+        504,
+        "AI 响应超时，请稍后重试。你的输入和草稿仍然保留。",
+      );
+    }
+    if (!response.ok)
+      throw new HttpError(
+        response.status === 429 ? 429 : 502,
+        response.status === 429
+          ? "AI 服务繁忙，请稍后重试。"
+          : "AI 暂时无法响应，请稍后重试或直接编辑档案。",
+      );
+    try {
+      const body = completionSchema.safeParse(await response.json());
+      if (!body.success) throw new InvalidOutput("response");
+      const choice = body.data.choices[0];
+      if (choice.finish_reason !== "stop")
+        throw new InvalidOutput(
+          choice.finish_reason === "length" ? "truncated" : "interrupted",
+        );
+      if (!choice.message.content?.trim()) throw new InvalidOutput("empty");
+      const content = choice.message.content.trim();
+      // Accept a single wrapping code fence, never extract arbitrary JSON fragments.
+      const fenced = content.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+      let value: unknown;
+      try {
+        value = JSON.parse(fenced ? fenced[1].trim() : content);
+      } catch {
+        throw new InvalidOutput("json");
+      }
+      const parsed = schema.safeParse(value);
+      if (!parsed.success)
+        throw new InvalidOutput("schema", [
+          ...new Set(parsed.error.issues.map((issue) => issue.code)),
+        ]);
+      return parsed.data;
+    } catch (error) {
+      if (requestSignal.aborted)
+        throw new HttpError(
+          504,
+          "AI 响应超时，请稍后重试。你的输入和草稿仍然保留。",
+        );
+      const failure =
+        error instanceof InvalidOutput ? error : new InvalidOutput("response");
+      // Metadata only: never log model output, messages, drafts or credentials.
+      console.warn("[DeepSeek] output_rejected", {
+        attempt: attempt + 1,
+        reason: failure.reason,
+        issueCodes: failure.issueCodes,
+      });
+      if (attempt === 1)
+        throw new HttpError(
+          502,
+          failure.reason === "truncated" || failure.reason === "interrupted"
+            ? "AI 回复中断，自动重试后仍未完成。你的输入和草稿已保留，请再试一次。"
+            : "AI 回复格式异常，自动重试后仍未恢复。你的输入和草稿已保留，请再试一次。",
+        );
+    }
   }
-  if (!response.ok)
-    throw new HttpError(
-      response.status === 429 ? 429 : 502,
-      response.status === 429
-        ? "AI 服务繁忙，请稍后重试。"
-        : "AI 暂时无法响应，请稍后重试或直接编辑档案。",
-    );
-  try {
-    const body = await response.json();
-    const choice = body.choices?.[0];
-    if (
-      choice?.finish_reason !== "stop" ||
-      typeof choice.message?.content !== "string"
-    )
-      throw new Error("Incomplete output");
-    return schema.parse(JSON.parse(choice.message.content));
-  } catch {
-    throw new HttpError(502, "AI 返回的内容不完整，本次未更新档案。请重试。");
-  }
+  throw new HttpError(502, "AI 暂时无法响应，请稍后重试。");
 }
 
 export const generateMatchScore = (

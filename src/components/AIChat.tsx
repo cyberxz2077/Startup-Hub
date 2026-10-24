@@ -31,6 +31,8 @@ export function AIChat({
   const [fileError, setFileError] = useState("");
   const end = useRef<HTMLDivElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const textInput = useRef<HTMLTextAreaElement>(null);
+  const sending = useRef(false);
   useEffect(() => {
     end.current?.scrollIntoView({
       behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -39,14 +41,37 @@ export function AIChat({
       block: "nearest",
     });
   }, [messages, loading]);
-  const send = async () => {
-    if ((!input.trim() && !attachment) || loading) return;
-    const sent = await onSendMessage(input.trim(), attachment);
-    if (sent) {
-      setInput("");
-      setAttachment(null);
-      if (fileInput.current) fileInput.current.value = "";
+  const send = async (text = input.trim()) => {
+    if ((!text && !attachment) || loading || sending.current) return;
+    sending.current = true;
+    setFileError("");
+    const sentAttachment = attachment;
+    try {
+      const sent = await onSendMessage(text, sentAttachment);
+      if (sent) {
+        // Preserve anything the user starts writing while the response is pending.
+        setInput((current) => (current.trim() === text ? "" : current));
+        setAttachment((current) =>
+          current === sentAttachment ? null : current,
+        );
+        if (fileInput.current) fileInput.current.value = "";
+      }
+    } finally {
+      sending.current = false;
     }
+  };
+  const choose = (suggestion: string) => {
+    if (loading || sending.current) return;
+    if (input.trim() || attachment) {
+      setInput((current) =>
+        current.trim() ? `${current}\n${suggestion}` : suggestion,
+      );
+      textInput.current?.focus();
+      return;
+    }
+    // Keep the selected answer in the composer if this request fails.
+    setInput(suggestion);
+    void send(suggestion);
   };
   const readFile = async (file?: File) => {
     setFileError("");
@@ -100,6 +125,38 @@ export function AIChat({
             >
               {message.text}
             </div>
+            {message.role === "model" &&
+              i === messages.length - 1 &&
+              !!message.suggestions?.length && (
+                <div className="mt-4" role="group" aria-label="建议回答">
+                  <div className="flex flex-col gap-2">
+                    {message.suggestions.map((suggestion, index) => (
+                      <button
+                        key={`${index}:${suggestion}`}
+                        type="button"
+                        disabled={loading}
+                        onClick={() => choose(suggestion)}
+                        className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 text-left text-xs leading-5 text-ink transition-colors hover:border-accent-blue hover:bg-blue-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-blue disabled:opacity-50"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="font-mono text-accent-blue shrink-0"
+                        >
+                          {index + 1}
+                        </span>
+                        <span className="min-w-0 break-words">
+                          {suggestion}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[10px] leading-5 text-ink-light">
+                    {input.trim() || attachment
+                      ? "选择会补充到输入框，发送前可以修改。"
+                      : "点击选择，也可以直接输入自己的想法。"}
+                  </p>
+                </div>
+              )}
           </div>
         ))}
         {loading && (
@@ -122,6 +179,7 @@ export function AIChat({
           <div className="mb-3 flex items-center justify-between text-xs gap-2 bg-blue-50 rounded-lg px-3 py-2">
             <span className="truncate">{attachment.name}</span>
             <button
+              disabled={loading}
               onClick={() => setAttachment(null)}
               aria-label="移除附件"
               className="p-1"
@@ -142,6 +200,7 @@ export function AIChat({
           </label>
           <textarea
             id="ai-input"
+            ref={textInput}
             value={input}
             maxLength={4000}
             onChange={(e) => setInput(e.target.value)}
@@ -163,12 +222,14 @@ export function AIChat({
             <input
               type="file"
               ref={fileInput}
+              disabled={loading}
               className="hidden"
               accept=".txt,.md"
               onChange={(e) => void readFile(e.target.files?.[0])}
             />
             <button
               type="button"
+              disabled={loading}
               onClick={() => fileInput.current?.click()}
               title="添加 TXT / Markdown 资料"
               aria-label="添加文字附件"

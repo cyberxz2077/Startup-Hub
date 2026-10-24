@@ -72,19 +72,20 @@ export const matchResultSchema = z.object({
   pros: z.array(z.string().max(500)).max(5),
   cons: z.array(z.string().max(500)).max(5),
 });
+export const chatSuggestionsSchema = z
+  .array(z.string().trim().min(1).max(160))
+  .max(4);
+export const chatMessageSchema = z.object({
+  role: z.enum(["user", "model"]),
+  text: z.string().min(1).max(16000),
+  suggestions: chatSuggestionsSchema.optional(),
+});
 export const chatSchema = z
   .object({
     mode: z.enum(["project", "profile"]),
-    messages: z
-      .array(
-        z.object({
-          role: z.enum(["user", "model"]),
-          text: z.string().min(1).max(16000),
-        }),
-      )
-      .min(1)
-      .max(30),
+    messages: z.array(chatMessageSchema).min(1).max(30),
     currentData: z.record(z.unknown()).optional(),
+    editedFields: z.array(z.string().min(1).max(40)).max(20).optional(),
   })
   .strict()
   .refine(

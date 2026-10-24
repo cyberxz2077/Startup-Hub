@@ -20,7 +20,11 @@ import {
   Attachment,
 } from "@/types";
 import { api, errorText } from "@/lib/client";
-import { projectSchema, profileSchema } from "@/lib/validation";
+import {
+  projectSchema,
+  profileSchema,
+  chatMessageSchema,
+} from "@/lib/validation";
 import { AIChat } from "./AIChat";
 import Image from "next/image";
 import { AvatarCropper } from "./ui/AvatarCropper";
@@ -79,6 +83,7 @@ export function Onboarding({
   const initial = mode === "project" ? initialProjectData : initialProfileData;
   const labels = mode === "project" ? projectLabels : profileLabels;
   const [data, setData] = useState<Draft>(initial);
+  const [editedFields, setEditedFields] = useState<string[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "model",
@@ -115,6 +120,7 @@ export function Onboarding({
           id?: string;
           published: boolean;
           messages?: Message[];
+          editedFields?: string[];
         } | null = null;
         try {
           const raw = sessionStorage.getItem(storageKey);
@@ -130,16 +136,25 @@ export function Onboarding({
             setData(parsed.data);
             setId(cached.id);
             setPublished(cached.published === true);
-            if (Array.isArray(cached.messages))
-              setMessages(
-                cached.messages
-                  .filter(
-                    (m) =>
-                      ["user", "model"].includes(m.role) &&
-                      typeof m.text === "string",
-                  )
-                  .slice(-30),
-              );
+            if (Array.isArray(cached.editedFields)) {
+              setEditedFields([
+                ...new Set(
+                  cached.editedFields.filter(
+                    (key) =>
+                      typeof key === "string" && Object.hasOwn(initial, key),
+                  ),
+                ),
+              ]);
+            }
+            if (Array.isArray(cached.messages)) {
+              const restored = cached.messages
+                .flatMap((message) => {
+                  const parsed = chatMessageSchema.safeParse(message);
+                  return parsed.success ? [parsed.data] : [];
+                })
+                .slice(-30);
+              if (restored.length) setMessages(restored);
+            }
             setNotice("已恢复此标签页中的草稿。");
             setLoaded(true);
             return;
@@ -179,18 +194,18 @@ export function Onboarding({
       abort.abort();
       controller.current?.abort();
     };
-  }, [mode, projectId, storageKey]);
+  }, [mode, projectId, storageKey, initial]);
   useEffect(() => {
     if (!loaded) return;
     try {
       sessionStorage.setItem(
         storageKey,
-        JSON.stringify({ data, id, published, messages }),
+        JSON.stringify({ data, id, published, messages, editedFields }),
       );
     } catch {
       setNotice("浏览器暂存不可用，请及时保存到账号。");
     }
-  }, [data, id, published, loaded, storageKey, messages]);
+  }, [data, id, published, loaded, storageKey, messages, editedFields]);
   const send = async (text: string, attachment?: Attachment | null) => {
     if (lock.current) return false;
     lock.current = true;
@@ -206,9 +221,13 @@ export function Onboarding({
     setMessages(next);
     controller.current = new AbortController();
     try {
-      const response = await api<{ reply: string; updates: Partial<Draft> }>(
+      const response = await api<{
+        reply: string;
+        updates: Partial<Draft>;
+        suggestions: string[];
+      }>(
         "/api/ai/chat",
-        { mode, messages: next, currentData: data },
+        { mode, messages: next, currentData: data, editedFields },
         controller.current.signal,
       );
       setData((old) => ({
@@ -221,8 +240,19 @@ export function Onboarding({
           ),
         ),
       }));
-      setMessages([...next, { role: "model", text: response.reply }]);
-      setNotice("AI 建议已填入草稿，检查并修改后再保存。");
+      setMessages([
+        ...next,
+        {
+          role: "model",
+          text: response.reply,
+          suggestions: response.suggestions,
+        },
+      ]);
+      setNotice(
+        Object.keys(response.updates).length
+          ? "AI 已整理本轮档案建议，检查草稿后再保存。"
+          : "",
+      );
       return true;
     } catch (e) {
       if (!controller.current.signal.aborted) {
@@ -268,6 +298,9 @@ export function Onboarding({
   };
   const setField = (key: string, value: string | string[]) => {
     setData((prev) => ({ ...prev, [key]: value }));
+    setEditedFields((previous) =>
+      previous.includes(key) ? previous : [...previous, key],
+    );
     setNotice("");
   };
   const field = (key: string) => {

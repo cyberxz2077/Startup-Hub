@@ -37,6 +37,7 @@ export interface ProfileData {
 export interface Message {
   role: "user" | "model";
   text: string;
+  suggestions?: string[];
 }
 
 export interface Attachment {
