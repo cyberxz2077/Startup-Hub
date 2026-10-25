@@ -61,6 +61,7 @@ export type PublicProfile = ProfileData & {
   updatedAt: string;
   projects: PublicProjectSummary[];
   projectCount: number;
+  acceptingBookings: boolean;
 };
 
 export interface Attachment {

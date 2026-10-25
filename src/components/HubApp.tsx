@@ -11,6 +11,7 @@ import {
   UserRound,
   Loader2,
   UsersRound,
+  CalendarClock,
 } from "lucide-react";
 import { Landing } from "./Landing";
 import { AuthForm, SessionUser } from "./AuthForm";
@@ -24,6 +25,7 @@ import { Dashboard } from "./Dashboard";
 import { PeopleShowcase } from "./PeopleShowcase";
 import { ProfileDetail } from "./ProfileDetail";
 import { ProjectDetail } from "./ProjectDetail";
+import { Schedule } from "./Schedule";
 import { api, errorText } from "@/lib/client";
 
 const protectedViews = new Set([
@@ -32,6 +34,7 @@ const protectedViews = new Set([
   "profile_create",
   "inbox",
   "dashboard",
+  "schedule",
 ]);
 export function HubApp() {
   const router = useRouter();
@@ -125,6 +128,7 @@ export function HubApp() {
     { view: "people_showcase", label: "发现伙伴", icon: UsersRound },
     { view: "service_showcase", label: "合作资源", icon: Grid2X2 },
     { view: "inbox", label: "消息", icon: Mail },
+    { view: "schedule", label: "时间表", icon: CalendarClock },
   ];
   return (
     <div className="min-h-dvh flex flex-col">
@@ -202,13 +206,13 @@ export function HubApp() {
         </nav>
         <nav
           aria-label="移动端主导航"
-          className="lg:hidden grid grid-cols-4 gap-1 px-3 pb-2"
+          className="lg:hidden grid grid-cols-5 gap-1 px-3 pb-2"
         >
           {navs.map((item) => (
             <Link
               key={item.view}
               href={`/?view=${item.view}`}
-              className={`flex items-center justify-center gap-1.5 rounded-lg px-1 py-2.5 text-[11px] ${activeNav === item.view ? "bg-white text-accent-blue" : "text-ink-light"}`}
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1.5 rounded-lg px-1 py-2.5 text-[11px] ${activeNav === item.view ? "bg-white text-accent-blue" : "text-ink-light"}`}
               aria-current={activeNav === item.view ? "page" : undefined}
             >
               <item.icon size={15} />
@@ -290,6 +294,12 @@ export function HubApp() {
                 initialId={params.get("conversation") || undefined}
               />
             )}
+            {view === "schedule" && user && (
+              <Schedule
+                userId={user.id}
+                initialTab={params.get("tab") || undefined}
+              />
+            )}
             {view === "dashboard" && user && (
               <Dashboard
                 userId={user.id}
@@ -309,6 +319,7 @@ export function HubApp() {
               "service_showcase",
               "inbox",
               "dashboard",
+              "schedule",
             ].includes(view) && <Landing />}
           </>
         )}

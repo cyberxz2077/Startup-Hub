@@ -22,6 +22,10 @@ model User {
   sentConversations Conversation[] @relation("starter")
   receivedConversations Conversation[] @relation("recipient")
   directMessages    DirectMessage[]
+  schedulePreference SchedulePreference?
+  availabilitySlots AvailabilitySlot[]
+  sentBookings      Booking[] @relation("booking_requester")
+  receivedBookings  Booking[] @relation("booking_host")
   name              String?
   avatar            String?
   bio               String?
@@ -220,6 +224,7 @@ model Conversation {
   recipient User @relation("recipient", fields: [recipientId], references: [id], onDelete: Cascade)
   projectId String? @map("project_id")
   messages DirectMessage[]
+  bookings Booking[]
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
   @@index([starterId, updatedAt])
@@ -235,8 +240,74 @@ model DirectMessage {
   sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
   requestId String @map("request_id")
   content String
+  subject String @default("")
+  emailSent Boolean @default(false) @map("email_sent")
+  kind String @default("text")
+  bookingId String? @map("booking_id")
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Restrict)
+  bookingEvent Json? @map("booking_event")
   createdAt DateTime @default(now()) @map("created_at")
   @@unique([senderId, requestId])
   @@index([conversationId, createdAt])
+  @@index([bookingId])
   @@map("direct_messages")
+}
+
+model SchedulePreference {
+  userId String @id @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled Boolean @default(false)
+  note String @default("")
+  meetingUrl String @default("") @map("meeting_url")
+  version Int @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@map("schedule_preferences")
+}
+
+model AvailabilitySlot {
+  id String @id @default(cuid())
+  userId String @map("user_id")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startsAt DateTime @map("starts_at")
+  endsAt DateTime @map("ends_at")
+  active Boolean @default(true)
+  bookings Booking[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([userId, startsAt, endsAt])
+  @@index([userId, active, startsAt])
+  @@map("availability_slots")
+}
+
+model Booking {
+  id String @id @default(cuid())
+  requesterId String @map("requester_id")
+  requester User @relation("booking_requester", fields: [requesterId], references: [id], onDelete: Restrict)
+  hostId String @map("host_id")
+  host User @relation("booking_host", fields: [hostId], references: [id], onDelete: Restrict)
+  conversationId String @map("conversation_id")
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  slotId String @map("slot_id")
+  slot AvailabilitySlot @relation(fields: [slotId], references: [id], onDelete: Restrict)
+  requestId String @map("request_id")
+  title String
+  note String @default("")
+  startsAt DateTime @map("starts_at")
+  endsAt DateTime @map("ends_at")
+  status String @default("confirmed")
+  meetingUrl String @default("") @map("meeting_url")
+  changeReason String @default("") @map("change_reason")
+  proposedSlotId String? @map("proposed_slot_id")
+  proposedStartsAt DateTime? @map("proposed_starts_at")
+  proposedEndsAt DateTime? @map("proposed_ends_at")
+  version Int @default(1)
+  messages DirectMessage[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  @@unique([requesterId, requestId])
+  @@index([requesterId, status, startsAt])
+  @@index([hostId, status, startsAt])
+  @@index([conversationId, createdAt])
+  @@index([slotId])
+  @@map("bookings")
 }

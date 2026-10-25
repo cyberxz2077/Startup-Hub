@@ -32,6 +32,7 @@ export function publicProfileSelect(projectLimit: number) {
         name: true,
         avatar: true,
         bio: true,
+        schedulePreference: { select: { enabled: true } },
         projects: {
           where: { published: true },
           orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -81,5 +82,6 @@ export function serializePublicProfile(profile: PublicRecord): PublicProfile {
       stage: textValue(project.stage),
     })),
     projectCount: profile.user._count.projects,
+    acceptingBookings: profile.user.schedulePreference?.enabled || false,
   };
 }

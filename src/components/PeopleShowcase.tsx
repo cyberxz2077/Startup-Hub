@@ -180,6 +180,11 @@ export function PeopleShowcase() {
                     {person.location}
                   </p>
                 )}
+                <p
+                  className={`text-[11px] mt-3 ${person.acceptingBookings ? "text-accent-blue" : "text-ink-light"}`}
+                >
+                  {person.acceptingBookings ? "开放预约交流" : "接受站内留言"}
+                </p>
                 <p className="text-sm leading-7 text-ink-light mt-4 line-clamp-3">
                   {person.bio || person.lookingFor}
                 </p>

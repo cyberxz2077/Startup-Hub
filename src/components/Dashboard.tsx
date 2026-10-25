@@ -9,6 +9,7 @@ import {
   Fingerprint,
   FolderOpen,
   Pencil,
+  CalendarClock,
 } from "lucide-react";
 import { api, errorText } from "@/lib/client";
 import type { ProfileData, ProjectWithMeta } from "@/types";
@@ -116,6 +117,28 @@ export function Dashboard({
           {error}
         </p>
       )}
+      <div className="surface p-5 flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-start gap-3">
+          <CalendarClock className="text-accent-blue mt-1" size={24} />
+          <div>
+            <h2 className="font-semibold">把交流排进时间表</h2>
+            <p className="text-sm text-ink-light mt-2">
+              设置是否接受预约，查看你约的人和预约你的伙伴。
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            className="btn-secondary"
+            href="/?view=schedule&tab=availability"
+          >
+            设置可约时间
+          </Link>
+          <Link className="btn-primary" href="/?view=schedule">
+            我的时间表
+          </Link>
+        </div>
+      </div>
       <div className="grid md:grid-cols-2 gap-5 mb-8">
         <section className="surface p-6 md:p-7">
           <div className="flex items-center justify-between mb-5">

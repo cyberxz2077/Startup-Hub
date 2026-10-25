@@ -18,6 +18,8 @@ export function ContactDialog({
   onSent: (id: string) => void;
 }) {
   const [content, setContent] = useState("");
+  const [subject, setSubject] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const requestId = useRef(crypto.randomUUID());
@@ -32,6 +34,8 @@ export function ContactDialog({
         targetId: target.targetId,
         targetType: target.targetType,
         content,
+        subject,
+        emailSent,
         requestId: requestId.current,
       });
       onSent(result.conversationId);
@@ -73,20 +77,51 @@ export function ContactDialog({
         <label className="sr-only" htmlFor="contact-content">
           你的消息
         </label>
+        <label className="block text-xs text-ink-light mb-4">
+          主题（选填）
+          <input
+            className="field mt-2"
+            maxLength={160}
+            value={subject}
+            disabled={busy}
+            onChange={(e) => {
+              setSubject(e.target.value);
+              requestId.current = crypto.randomUUID();
+            }}
+          />
+        </label>
         <textarea
           autoFocus
           id="contact-content"
           className="field leading-7"
           rows={5}
           required
-          maxLength={4000}
+          maxLength={20000}
           value={content}
+          disabled={busy}
           onChange={(e) => {
             setContent(e.target.value);
             requestId.current = crypto.randomUUID();
           }}
           placeholder="你好，我看到你的项目…"
         />
+        <div className="mt-3 text-xs text-ink-light leading-6">
+          <p>支持长信，最多20,000字。站内消息会在对方打开网站时显示。</p>
+          <label className="flex items-start gap-2 mt-2">
+            <input
+              type="checkbox"
+              disabled={busy}
+              className="mt-1"
+              checked={emailSent}
+              onChange={(e) => {
+                setEmailSent(e.target.checked);
+                requestId.current = crypto.randomUUID();
+              }}
+            />
+            我已通过其他邮箱另发邮件，请对方注意查收
+          </label>
+          <p className="text-[10px]">此项仅作说明，本站不会代发邮件。</p>
+        </div>
         {error && (
           <p role="alert" className="error-notice mt-4">
             {error}

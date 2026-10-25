@@ -41,8 +41,20 @@ export async function GET(request: Request) {
       take: 100,
       orderBy: { updatedAt: "desc" },
       include: {
-        starter: { select: { id: true, name: true } },
-        recipient: { select: { id: true, name: true } },
+        starter: {
+          select: {
+            id: true,
+            name: true,
+            profile: { select: { published: true } },
+          },
+        },
+        recipient: {
+          select: {
+            id: true,
+            name: true,
+            profile: { select: { published: true } },
+          },
+        },
         messages: { take: 1, orderBy: { createdAt: "desc" } },
       },
     });
@@ -50,7 +62,7 @@ export async function GET(request: Request) {
       conversations.map((c) => ({
         id: c.id,
         person: c.starterId === user.id ? c.recipient : c.starter,
-        lastMessage: c.messages[0]?.content || "",
+        lastMessage: c.messages[0]?.content.slice(0, 180) || "",
         updatedAt: c.updatedAt,
       })),
     );
@@ -70,7 +82,9 @@ export async function POST(request: Request) {
           conversationId: z.string().cuid().optional(),
           targetId: z.string().cuid().optional(),
           targetType: z.enum(["user", "project"]).optional(),
-          content: z.string().trim().min(1).max(4000),
+          content: z.string().trim().min(1).max(20000),
+          subject: z.string().trim().max(160).default(""),
+          emailSent: z.boolean().default(false),
           requestId: z.string().uuid(),
         })
         .strict(),
@@ -135,7 +149,9 @@ export async function POST(request: Request) {
     if (existing) {
       if (
         existing.conversationId !== conversationId ||
-        existing.content !== data.content
+        existing.content !== data.content ||
+        existing.subject !== data.subject ||
+        existing.emailSent !== data.emailSent
       )
         throw new HttpError(409, "请求标识已使用。");
       return json({ message: existing, conversationId });
@@ -146,6 +162,8 @@ export async function POST(request: Request) {
           conversationId: conversationId!,
           senderId: user.id,
           content: data.content,
+          subject: data.subject,
+          emailSent: data.emailSent,
           requestId: data.requestId,
         },
       });

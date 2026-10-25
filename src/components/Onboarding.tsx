@@ -479,6 +479,14 @@ export function Onboarding({
             <MessageSquare size={15} /> AI 助手
           </button>
         </div>
+        {mode === "profile" && (
+          <Link
+            href="/?view=schedule&tab=availability"
+            className="text-xs text-accent-blue inline-flex py-2 underline underline-offset-4"
+          >
+            设置是否接受预约与可用时间 →
+          </Link>
+        )}
       </div>
       <div className="page-container grid lg:grid-cols-[340px_1fr] xl:grid-cols-[370px_1fr] gap-5 pb-8 items-start">
         <div

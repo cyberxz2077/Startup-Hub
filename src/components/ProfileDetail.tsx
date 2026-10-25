@@ -98,6 +98,11 @@ export function ProfileDetail({
                       {profile.location}
                     </p>
                   )}
+                  <p className="text-xs text-ink-light mt-3">
+                    {profile.acceptingBookings
+                      ? "开放预约 · 在聊天中选择可用时间"
+                      : "目前只接受站内留言"}
+                  </p>
                 </div>
               </div>
               {userId === profile.userId ? (

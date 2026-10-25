@@ -50,6 +50,7 @@ TEST_DATABASE_URL='postgresql://USER@127.0.0.1:PORT/startup_hub_test' npm test
 
 - [重新上线：平台选择、环境变量、密码账户与数据迁移](docs/重新上线.md)
 - [代码审核与验证](docs/代码审核与验证.md)
+- [预约与长信：开放时间、双向改期、会议链接和消息规则](docs/预约与长信.md)
 
 应用不再调用 SecondMe 或 Gemini。`.secondme/` 及其旧技能文件仅作历史初始化资料保留，当前运行不读取它们。原 `.env` 保留，新的 `.env.local` 优先级更高。
 
