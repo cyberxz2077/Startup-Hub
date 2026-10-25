@@ -10,7 +10,16 @@ import {
   overlaps,
   scheduleBounds,
   scheduleDate,
+  slotIso,
 } from "./schedule-time";
+import {
+  containsInterval,
+  freeIntervals,
+  mergeIntervals,
+  nextQuarter,
+  subtractIntervals,
+  type Interval,
+} from "./schedule-intervals";
 import type { BookingEvent } from "@/types/schedule";
 
 type Tx = Prisma.TransactionClient;
@@ -32,7 +41,7 @@ export const preferenceSchema = z
     note: z.string().trim().max(600),
     meetingUrl: meetingUrlSchema,
     version: z.number().int().min(0),
-    slots: z.array(slotSchema).max(120),
+    slots: z.array(slotSchema).max(1488),
   })
   .strict();
 
@@ -66,15 +75,15 @@ export function validateSlot(startsAt: Date, endsAt: Date, now = new Date()) {
     startsAt <= now ||
     date < min ||
     date > max ||
-    scheduleDate(endsAt) !== date ||
+    endsAt.getTime() > new Date(slotIso(date, "24:00")).getTime() ||
     duration < 15 ||
-    duration > 120 ||
+    duration > 1440 ||
     duration % 15 !== 0 ||
     startsAt.getTime() % (15 * MINUTE) !== 0
   )
     throw new HttpError(
       400,
-      "请设置未来30天内、同一天的15–120分钟时段，并以15分钟为间隔。",
+      "请设置未来30天内的可用时间，以15分钟为间隔，最晚可到当天24:00。",
     );
 }
 
@@ -82,7 +91,7 @@ export async function ownSchedule(userId: string) {
   const [preference, slots, bookings] = await Promise.all([
     prisma.schedulePreference.findUnique({ where: { userId } }),
     prisma.availabilitySlot.findMany({
-      where: { userId, active: true, startsAt: { gt: new Date() } },
+      where: { userId, active: true, endsAt: { gt: new Date() } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.booking.findMany({
@@ -104,14 +113,43 @@ export async function ownSchedule(userId: string) {
     slots: slots.map((slot) => ({
       ...slot,
       booked: bookings.some(
-        (b) => b.status === "confirmed" && b.slotId === slot.id,
+        (b) =>
+          b.status === "confirmed" && b.hostId === userId && overlaps(slot, b),
       ),
-      available: !bookings.some(
-        (b) => b.status === "confirmed" && overlaps(slot, b),
-      ),
+      available:
+        freeIntervals(
+          slot,
+          bookings.filter((b) => b.status === "confirmed"),
+        ).length > 0,
     })),
     bookings,
   };
+}
+
+async function replaceWindows(tx: Tx, userId: string, intervals: Interval[]) {
+  if (intervals.length) {
+    await tx.availabilitySlot.createMany({
+      data: intervals.map((s) => ({ userId, ...s })),
+      skipDuplicates: true,
+    });
+    await tx.availabilitySlot.updateMany({
+      where: { userId, OR: intervals },
+      data: { active: true },
+    });
+  }
+  const keep = intervals.length
+    ? (
+        await tx.availabilitySlot.findMany({
+          where: { userId, OR: intervals },
+          select: { id: true },
+        })
+      ).map((s) => s.id)
+    : [];
+  // Bookings retain their original foreign key and exact meeting times.
+  await tx.availabilitySlot.updateMany({
+    where: { userId, active: true, id: { notIn: keep } },
+    data: { active: false },
+  });
 }
 
 export async function savePreferences(
@@ -128,7 +166,7 @@ export async function savePreferences(
         throw new HttpError(409, "预约设置已在其他页面更新，请刷新后再保存。");
       const [previous, bookings] = await Promise.all([
         tx.availabilitySlot.findMany({
-          where: { userId, active: true, startsAt: { gt: new Date() } },
+          where: { userId, active: true, endsAt: { gt: new Date() } },
         }),
         tx.booking.findMany({
           where: {
@@ -138,28 +176,46 @@ export async function savePreferences(
           },
         }),
       ]);
-      const slots = data.slots
+      const now = new Date();
+      const cutoff = nextQuarter(now);
+      const submitted = data.slots
         .map((s) => ({
           ...s,
           startsAt: new Date(s.startsAt),
           endsAt: new Date(s.endsAt),
         }))
         .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
-      for (let i = 0; i < slots.length; i++) {
-        validateSlot(slots[i].startsAt, slots[i].endsAt);
-        if (i && overlaps(slots[i - 1], slots[i]))
+      for (let i = 0; i < submitted.length; i++) {
+        const slot = submitted[i];
+        // An all-day window can already have started while the editor is open.
+        // Check its original grid before clipping only the elapsed part.
+        validateSlot(
+          slot.startsAt,
+          slot.endsAt,
+          new Date(Math.min(+now, +slot.startsAt - 1)),
+        );
+        if (i && overlaps(submitted[i - 1], slot))
           throw new HttpError(400, "可用时段不能相互重叠。");
-        if (slots[i].id && !previous.some((s) => s.id === slots[i].id))
+        if (slot.id && !previous.some((s) => s.id === slot.id))
           throw new HttpError(409, "部分时段已变化，请刷新后重试。");
       }
-      for (const old of previous) {
+      const slots = mergeIntervals(
+        submitted
+          .filter((s) => s.endsAt > cutoff)
+          .map((s) => ({
+            startsAt: new Date(Math.max(+s.startsAt, +cutoff)),
+            endsAt: s.endsAt,
+          })),
+      );
+      for (const booking of bookings.filter(
+        (b) => b.hostId === userId && b.endsAt > cutoff,
+      )) {
         if (
-          bookings.some((b) => b.slotId === old.id) &&
-          !slots.some(
-            (s) =>
-              s.id === old.id &&
-              s.startsAt.getTime() === old.startsAt.getTime() &&
-              s.endsAt.getTime() === old.endsAt.getTime(),
+          !slots.some((s) =>
+            containsInterval(s, {
+              startsAt: new Date(Math.max(+booking.startsAt, +cutoff)),
+              endsAt: booking.endsAt,
+            }),
           )
         )
           throw new HttpError(
@@ -173,40 +229,14 @@ export async function savePreferences(
         !slots.some(
           (s) =>
             scheduleDate(s.startsAt) <= bounds.early &&
-            !bookings.some((b) => overlaps(s, b)),
+            freeIntervals(s, bookings, now).length > 0,
         )
       )
         throw new HttpError(
           400,
           "开放预约时，请至少提供未来三天内一个未被占用的可用时段。",
         );
-      const intervals = slots.map((slot) => ({
-        startsAt: slot.startsAt,
-        endsAt: slot.endsAt,
-      }));
-      if (slots.length) {
-        await tx.availabilitySlot.createMany({
-          data: intervals.map((slot) => ({ userId, ...slot })),
-          skipDuplicates: true,
-        });
-        await tx.availabilitySlot.updateMany({
-          where: { userId, OR: intervals },
-          data: { active: true },
-        });
-      }
-      const keep = slots.length
-        ? (
-            await tx.availabilitySlot.findMany({
-              where: { userId, OR: intervals },
-              select: { id: true },
-            })
-          ).map((slot) => slot.id)
-        : [];
-      // Withdraw slots without deleting the records used by booking history.
-      await tx.availabilitySlot.updateMany({
-        where: { userId, active: true, id: { notIn: keep } },
-        data: { active: false },
-      });
+      await replaceWindows(tx, userId, slots);
       await tx.schedulePreference.upsert({
         where: { userId },
         create: {
@@ -255,7 +285,7 @@ export async function availableTo(
   const [preference, slots, busy] = await Promise.all([
     prisma.schedulePreference.findUnique({ where: { userId: hostId } }),
     prisma.availabilitySlot.findMany({
-      where: { userId: hostId, active: true, startsAt: { gt: new Date() } },
+      where: { userId: hostId, active: true, endsAt: { gt: new Date() } },
       orderBy: { startsAt: "asc" },
     }),
     prisma.booking.findMany({
@@ -279,10 +309,11 @@ export async function availableTo(
           .filter(
             (s) =>
               scheduleDate(s.startsAt) >= bounds.min &&
-              scheduleDate(s.startsAt) <= bounds.max &&
-              !busy.some((b) => overlaps(s, b)),
+              scheduleDate(s.startsAt) <= bounds.max,
           )
-          .map((s) => ({ id: s.id, startsAt: s.startsAt, endsAt: s.endsAt }))
+          .flatMap((s) =>
+            freeIntervals(s, busy).map((part) => ({ id: s.id, ...part })),
+          )
       : [],
   };
 }
@@ -293,6 +324,7 @@ async function usableSlot(
   hostId: string,
   requesterId: string,
   excludeBookingId?: string,
+  requested?: { startsAt?: string; endsAt?: string },
 ) {
   const preference = await tx.schedulePreference.findUnique({
     where: { userId: hostId },
@@ -303,20 +335,35 @@ async function usableSlot(
     where: { id: slotId, userId: hostId, active: true },
   });
   if (!slot) throw new HttpError(409, "这个时段已不可用，请重新选择。");
-  validateSlot(slot.startsAt, slot.endsAt);
+  if (!!requested?.startsAt !== !!requested?.endsAt)
+    throw new HttpError(400, "请选择完整的会议起止时间。");
+  const interval =
+    requested?.startsAt && requested.endsAt
+      ? {
+          startsAt: new Date(requested.startsAt),
+          endsAt: new Date(requested.endsAt),
+        }
+      : { startsAt: slot.startsAt, endsAt: slot.endsAt };
+  // Older clients may still send only a short slot ID. A broad window always
+  // requires explicit meeting times, so it cannot be booked for a whole day by accident.
+  if (!requested?.startsAt && +slot.endsAt - +slot.startsAt > 120 * MINUTE)
+    throw new HttpError(400, "请选择具体会议时间，或刷新页面后重试。");
+  validateSlot(interval.startsAt, interval.endsAt);
+  if (!containsInterval(slot, interval))
+    throw new HttpError(409, "会议时间超出了对方的开放范围，请重新选择。");
   const conflict = await tx.booking.findFirst({
     where: {
       status: "confirmed",
       id: { not: excludeBookingId },
-      startsAt: { lt: slot.endsAt },
-      endsAt: { gt: slot.startsAt },
+      startsAt: { lt: interval.endsAt },
+      endsAt: { gt: interval.startsAt },
       OR: [...participantWhere(requesterId).OR, ...participantWhere(hostId).OR],
     },
     select: { id: true },
   });
   if (conflict)
     throw new HttpError(409, "这个时段与你或对方的其他预约冲突，请重新选择。");
-  return { slot, preference };
+  return { slot: { ...slot, ...interval }, preference };
 }
 
 async function eventMessage(
@@ -353,6 +400,8 @@ export const createBookingSchema = z
   .object({
     conversationId: z.string().cuid(),
     slotId: z.string().cuid(),
+    startsAt: z.string().datetime().optional(),
+    endsAt: z.string().datetime().optional(),
     requestId: z.string().uuid(),
     title: z.string().trim().min(1).max(120),
     note: z.string().trim().max(3000).default(""),
@@ -390,6 +439,10 @@ export async function createBooking(
           existing.slotId !== data.slotId ||
           existing.title !== data.title ||
           existing.note !== data.note ||
+          (data.startsAt !== undefined &&
+            +existing.startsAt !== +new Date(data.startsAt)) ||
+          (data.endsAt !== undefined &&
+            +existing.endsAt !== +new Date(data.endsAt)) ||
           (data.meetingUrl !== undefined &&
             existing.meetingUrl !== meetingLink(data.meetingUrl))
         )
@@ -401,6 +454,8 @@ export async function createBooking(
         data.slotId,
         hostId,
         requesterId,
+        undefined,
+        data,
       );
       const booking = await tx.booking.create({
         data: {
@@ -435,6 +490,8 @@ export const changeBookingSchema = z.discriminatedUnion("action", [
       action: z.literal("reschedule"),
       version: z.number().int(),
       slotId: z.string().cuid(),
+      startsAt: z.string().datetime().optional(),
+      endsAt: z.string().datetime().optional(),
       reason: z.string().trim().max(2000).default(""),
     })
     .strict(),
@@ -444,6 +501,8 @@ export const changeBookingSchema = z.discriminatedUnion("action", [
       version: z.number().int(),
       reason: z.string().trim().min(1).max(2000),
       proposedSlotId: z.string().cuid().optional(),
+      proposedStartsAt: z.string().datetime().optional(),
+      proposedEndsAt: z.string().datetime().optional(),
     })
     .strict(),
   z
@@ -502,8 +561,13 @@ export async function changeBooking(
           booking.hostId,
           booking.requesterId,
           id,
+          data,
         );
-        if (slot.id === booking.slotId && booking.status === "confirmed")
+        if (
+          +slot.startsAt === +booking.startsAt &&
+          +slot.endsAt === +booking.endsAt &&
+          booking.status === "confirmed"
+        )
           throw new HttpError(400, "请选择一个新的时段。");
         update = {
           ...update,
@@ -525,6 +589,11 @@ export async function changeBooking(
       } else if (data.action === "request_change") {
         if (userId !== booking.hostId)
           throw new HttpError(403, "发起人请直接选择新时段完成改期。");
+        if (
+          !data.proposedSlotId &&
+          (data.proposedStartsAt || data.proposedEndsAt)
+        )
+          throw new HttpError(400, "请选择完整的建议时间。");
         const proposed = data.proposedSlotId
           ? (
               await usableSlot(
@@ -533,23 +602,45 @@ export async function changeBooking(
                 booking.hostId,
                 booking.requesterId,
                 id,
+                {
+                  startsAt: data.proposedStartsAt,
+                  endsAt: data.proposedEndsAt,
+                },
               )
             ).slot
           : null;
-        if (proposed?.id === booking.slotId)
-          throw new HttpError(400, "建议时间应与原预约时间不同。");
+        if (proposed && overlaps(proposed, booking))
+          throw new HttpError(400, "建议时间不能包含原预约已不可用的部分。");
+        const active = await tx.availabilitySlot.findMany({
+          where: { userId: booking.hostId, active: true },
+        });
+        await replaceWindows(
+          tx,
+          booking.hostId,
+          active.flatMap((s) => subtractIntervals(s, [booking])),
+        );
+        await tx.schedulePreference.update({
+          where: { userId: booking.hostId },
+          data: { version: { increment: 1 } },
+        });
+        const proposedWindow = proposed
+          ? await tx.availabilitySlot.findFirst({
+              where: {
+                userId: booking.hostId,
+                active: true,
+                startsAt: { lte: proposed.startsAt },
+                endsAt: { gte: proposed.endsAt },
+              },
+            })
+          : null;
         update = {
           ...update,
           status: "change_requested",
           changeReason: data.reason,
-          proposedSlotId: proposed?.id || null,
+          proposedSlotId: proposedWindow?.id || null,
           proposedStartsAt: proposed?.startsAt || null,
           proposedEndsAt: proposed?.endsAt || null,
         };
-        await tx.availabilitySlot.update({
-          where: { id: booking.slotId },
-          data: { active: false },
-        });
         Object.assign(event, {
           action: "change_requested",
           reason: data.reason,

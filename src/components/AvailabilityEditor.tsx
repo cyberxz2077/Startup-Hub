@@ -1,23 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { api, errorText } from "@/lib/client";
-import {
-  addDays,
-  scheduleBounds,
-  scheduleDate,
-  scheduleTime,
-  slotIso,
-} from "@/lib/schedule-time";
+import { cellsToIntervals, intervalCells } from "@/lib/schedule-intervals";
 import type { OwnSchedule } from "@/types/schedule";
-type Row = {
-  key: string;
-  id?: string;
-  date: string;
-  start: string;
-  end: string;
-  booked?: boolean;
-};
+import { WeeklyAvailabilityGrid } from "./WeeklyAvailabilityGrid";
 export function AvailabilityEditor({
   data,
   onSaved,
@@ -28,40 +15,10 @@ export function AvailabilityEditor({
   const [enabled, setEnabled] = useState(data.settings.enabled);
   const [note, setNote] = useState(data.settings.note);
   const [meetingUrl, setMeetingUrl] = useState(data.settings.meetingUrl);
-  const [rows, setRows] = useState<Row[]>(
-    data.slots.map((s) => ({
-      key: s.id,
-      id: s.id,
-      date: scheduleDate(s.startsAt),
-      start: scheduleTime(s.startsAt),
-      end: scheduleTime(s.endsAt),
-      booked: s.booked,
-    })),
-  );
+  const [cells, setCells] = useState(() => intervalCells(data.slots));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lock = useRef(false);
-  const bounds = scheduleBounds();
-  const update = (
-    key: string,
-    field: "date" | "start" | "end",
-    value: string,
-  ) =>
-    setRows((current) =>
-      current.map((row) =>
-        row.key === key ? { ...row, [field]: value } : row,
-      ),
-    );
-  const add = (days = 1) =>
-    setRows((current) => [
-      ...current,
-      ...Array.from({ length: days }, (_, i) => ({
-        key: crypto.randomUUID(),
-        date: addDays(bounds.min, i + 1),
-        start: "14:00",
-        end: "14:30",
-      })),
-    ]);
   const save = async () => {
     if (lock.current) return;
     lock.current = true;
@@ -73,11 +30,7 @@ export function AvailabilityEditor({
         note,
         meetingUrl,
         version: data.settings.version,
-        slots: rows.map((row) => ({
-          ...(row.id ? { id: row.id } : {}),
-          startsAt: slotIso(row.date, row.start),
-          endsAt: slotIso(row.date, row.end),
-        })),
+        slots: cellsToIntervals(cells),
       });
       onSaved(next);
     } catch (e) {
@@ -99,7 +52,7 @@ export function AvailabilityEditor({
         <div>
           <h2 className="text-xl font-semibold">由你决定何时开放交流</h2>
           <p className="text-sm text-ink-light mt-3 leading-7">
-            北京时间（UTC+8）。每个时段可预约一次，时长15–120分钟。
+            选出你愿意交流的时间范围，对方再选择具体的会议时间。支持全天开放。
           </p>
         </div>
         <button className="btn-primary" disabled={busy}>
@@ -166,106 +119,13 @@ export function AvailabilityEditor({
           只在新预约确认后提供给预约双方；修改默认值不会改动已有会议。
         </span>
       </label>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h3 className="font-semibold">
-          可预约时段{" "}
-          <span className="font-normal text-xs text-ink-light">
-            {rows.length} / 120
-          </span>
-        </h3>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            disabled={busy || rows.length > 117}
-            className="btn-secondary !text-xs !py-2"
-            onClick={() => add(3)}
-          >
-            填入未来三天
-          </button>
-          <button
-            type="button"
-            disabled={busy || rows.length >= 120}
-            className="btn-secondary !text-xs !py-2"
-            onClick={() => add()}
-          >
-            <Plus size={14} />
-            添加时段
-          </button>
-        </div>
-      </div>
-      {rows.length === 0 && (
-        <p className="rounded-xl bg-paper p-6 text-sm text-ink-light mb-5">
-          还没有设置时间。你可以先填入未来三天，再按实际安排调整。
-        </p>
-      )}
-      <div className="space-y-3 mb-5">
-        {rows.map((row, index) => (
-          <fieldset
-            key={row.key}
-            disabled={busy}
-            className="rounded-xl border border-border p-3 flex flex-wrap items-end gap-3"
-          >
-            <legend className="sr-only">可用时段 {index + 1}</legend>
-            <label className="text-[11px] text-ink-light flex-1 min-w-[150px]">
-              日期
-              <input
-                aria-label={`时段${index + 1}日期`}
-                required
-                disabled={row.booked}
-                type="date"
-                min={bounds.min}
-                max={bounds.max}
-                value={row.date}
-                onChange={(e) => update(row.key, "date", e.target.value)}
-                className="field mt-1"
-              />
-            </label>
-            <label className="text-[11px] text-ink-light flex-1 min-w-[100px]">
-              开始
-              <input
-                aria-label={`时段${index + 1}开始`}
-                required
-                disabled={row.booked}
-                type="time"
-                step={900}
-                value={row.start}
-                onChange={(e) => update(row.key, "start", e.target.value)}
-                className="field mt-1"
-              />
-            </label>
-            <label className="text-[11px] text-ink-light flex-1 min-w-[100px]">
-              结束
-              <input
-                aria-label={`时段${index + 1}结束`}
-                required
-                disabled={row.booked}
-                type="time"
-                step={900}
-                value={row.end}
-                onChange={(e) => update(row.key, "end", e.target.value)}
-                className="field mt-1"
-              />
-            </label>
-            {row.booked ? (
-              <span className="text-xs text-accent-blue py-3">
-                已有预约，请在计划中申请改期
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="icon-btn mb-1"
-                aria-label={`移除时段${index + 1}`}
-                onClick={() =>
-                  setRows((current) => current.filter((r) => r.key !== row.key))
-                }
-              >
-                <X size={16} />
-              </button>
-            )}
-          </fieldset>
-        ))}
-      </div>
-      {!enabled && rows.length > 0 && (
+      <WeeklyAvailabilityGrid
+        cells={cells}
+        onChange={setCells}
+        bookings={data.bookings}
+        disabled={busy}
+      />
+      {!enabled && cells.size > 0 && (
         <p className="notice text-xs mb-4">
           这些时段会保留，但在开启预约前不会提供给别人选择。
         </p>

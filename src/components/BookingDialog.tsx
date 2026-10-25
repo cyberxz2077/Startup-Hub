@@ -4,6 +4,7 @@ import { CalendarClock, Loader2, X } from "lucide-react";
 import { api, errorText } from "@/lib/client";
 import { formatSlot, scheduleDate, scheduleTime } from "@/lib/schedule-time";
 import type { PersonAvailability, ScheduleBooking } from "@/types/schedule";
+import { QUARTER } from "@/lib/schedule-intervals";
 import { Modal } from "./ui/Modal";
 
 export type BookingAction =
@@ -39,7 +40,8 @@ export function BookingDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [date, setDate] = useState("");
-  const [slotId, setSlotId] = useState("");
+  const [choice, setChoice] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [title, setTitle] = useState(booking?.title || "");
   const [note, setNote] = useState("");
   const [meetingUrl, setMeetingUrl] = useState(booking?.meetingUrl || "");
@@ -56,19 +58,29 @@ export function BookingDialog({
       abort.signal,
     )
       .then((result) => {
-        const slots = result.slots.filter((s) => s.id !== booking?.slotId);
-        setAvailability({ ...result, slots });
-        const preferred = slots.find(
-          (s) => action === "reschedule" && s.id === booking?.proposedSlotId,
-        );
+        const slots = result.slots;
+        setAvailability(result);
+        const preferred =
+          action === "reschedule" &&
+          booking?.proposedStartsAt &&
+          booking.proposedEndsAt
+            ? slots.find(
+                (s) =>
+                  s.startsAt <= booking.proposedStartsAt! &&
+                  s.endsAt >= booking.proposedEndsAt!,
+              )
+            : undefined;
         setDate(
           preferred
-            ? scheduleDate(preferred.startsAt)
+            ? scheduleDate(booking!.proposedStartsAt!)
             : slots[0]
               ? scheduleDate(slots[0].startsAt)
               : "",
         );
-        if (preferred) setSlotId(preferred.id);
+        if (preferred) {
+          setChoice(`${preferred.id}:${booking!.proposedStartsAt}`);
+          setEndsAt(booking!.proposedEndsAt!);
+        }
       })
       .catch((e) => {
         if (!abort.signal.aborted) setError(errorText(e));
@@ -78,6 +90,38 @@ export function BookingDialog({
       });
     return () => abort.abort();
   }, [action, booking, person.id]);
+  const choices = (availability?.slots || [])
+    .filter((s) => scheduleDate(s.startsAt) === date)
+    .flatMap((s) => {
+      const result = [];
+      for (
+        let t = +new Date(s.startsAt);
+        t + QUARTER <= +new Date(s.endsAt);
+        t += QUARTER
+      ) {
+        const startsAt = new Date(t).toISOString();
+        result.push({
+          key: `${s.id}:${startsAt}`,
+          slotId: s.id,
+          startsAt,
+          limit: s.endsAt,
+        });
+      }
+      return result;
+    });
+  const selected = choices.find((c) => c.key === choice);
+  const endOptions: string[] = [];
+  if (selected)
+    for (
+      let t = +new Date(selected.startsAt) + QUARTER;
+      t <= +new Date(selected.limit);
+      t += QUARTER
+    )
+      endOptions.push(new Date(t).toISOString());
+  const validSelection = !!selected && endOptions.includes(endsAt);
+  const interval = validSelection
+    ? { slotId: selected!.slotId, startsAt: selected!.startsAt, endsAt }
+    : null;
   const save = async () => {
     if (lock.current) return;
     lock.current = true;
@@ -87,7 +131,7 @@ export function BookingDialog({
       if (action === "create") {
         await api("/api/bookings", {
           conversationId,
-          slotId,
+          ...interval,
           title,
           note,
           requestId: requestId.current,
@@ -98,9 +142,18 @@ export function BookingDialog({
         await api(`/api/bookings/${booking.id}`, {
           action,
           version: booking.version,
-          ...(action === "reschedule" ? { slotId, reason: note } : {}),
+          ...(action === "reschedule" ? { ...interval, reason: note } : {}),
           ...(action === "request_change"
-            ? { reason: note, ...(slotId ? { proposedSlotId: slotId } : {}) }
+            ? {
+                reason: note,
+                ...(interval
+                  ? {
+                      proposedSlotId: interval.slotId,
+                      proposedStartsAt: interval.startsAt,
+                      proposedEndsAt: interval.endsAt,
+                    }
+                  : {}),
+              }
             : {}),
           ...(action === "cancel" ? { reason: note } : {}),
           ...(action === "update_link" ? { meetingUrl } : {}),
@@ -211,7 +264,8 @@ export function BookingDialog({
                       value={date}
                       onChange={(e) => {
                         setDate(e.target.value);
-                        setSlotId("");
+                        setChoice("");
+                        setEndsAt("");
                         requestId.current = crypto.randomUUID();
                       }}
                     >
@@ -222,33 +276,81 @@ export function BookingDialog({
                       ))}
                     </select>
                   </label>
-                  <div
-                    role="group"
-                    aria-label="可预约时段"
-                    className="grid grid-cols-2 gap-2 mt-3"
-                  >
-                    {availability.slots
-                      .filter((s) => scheduleDate(s.startsAt) === date)
-                      .map((s) => (
-                        <button
-                          type="button"
-                          key={s.id}
-                          aria-pressed={slotId === s.id}
-                          disabled={busy}
-                          className={`rounded-xl border px-3 py-3 text-sm ${slotId === s.id ? "border-accent-blue bg-blue-50 text-accent-blue" : "border-border hover:border-accent-blue"}`}
-                          onClick={() => {
-                            setSlotId(s.id);
-                            requestId.current = crypto.randomUUID();
-                          }}
-                        >
-                          {scheduleTime(s.startsAt)}–{scheduleTime(s.endsAt)}
-                        </button>
-                      ))}
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <label className="block text-sm">
+                      开始时间
+                      <select
+                        className="field mt-2"
+                        disabled={busy}
+                        value={choice}
+                        onChange={(e) => {
+                          const next = choices.find(
+                            (c) => c.key === e.target.value,
+                          );
+                          setChoice(e.target.value);
+                          setEndsAt(
+                            next
+                              ? new Date(
+                                  Math.min(
+                                    +new Date(next.startsAt) + 2 * QUARTER,
+                                    +new Date(next.limit),
+                                  ),
+                                ).toISOString()
+                              : "",
+                          );
+                          requestId.current = crypto.randomUUID();
+                        }}
+                      >
+                        <option value="">请选择时间</option>
+                        {choices.map((c) => (
+                          <option key={c.key} value={c.key}>
+                            {scheduleTime(c.startsAt)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block text-sm">
+                      结束时间
+                      <select
+                        className="field mt-2"
+                        disabled={busy || !selected}
+                        value={endsAt}
+                        onChange={(e) => {
+                          setEndsAt(e.target.value);
+                          requestId.current = crypto.randomUUID();
+                        }}
+                      >
+                        {!selected && <option value="">先选开始时间</option>}
+                        {endOptions.map((end) => (
+                          <option key={end} value={end}>
+                            {scheduleDate(end) === date
+                              ? scheduleTime(end)
+                              : "24:00"}{" "}
+                            ·{" "}
+                            {(+new Date(end) - +new Date(selected!.startsAt)) /
+                              60000}
+                            分钟
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
+                  {interval && (
+                    <p className="mt-3 rounded-xl bg-blue-50 p-3 text-sm leading-6 text-accent-blue">
+                      {formatSlot(interval.startsAt, interval.endsAt)}
+                      <br />
+                      <span className="text-xs">
+                        只占用所选会议时间，其他开放时间仍可预约。
+                      </span>
+                    </p>
+                  )}
                   {action === "request_change" && (
                     <button
                       type="button"
-                      onClick={() => setSlotId("")}
+                      onClick={() => {
+                        setChoice("");
+                        setEndsAt("");
+                      }}
                       disabled={busy}
                       className="text-xs text-accent-blue mt-3"
                     >
@@ -316,7 +418,7 @@ export function BookingDialog({
           disabled={
             busy ||
             loading ||
-            (needsSlot && !slotId) ||
+            (needsSlot && !validSelection) ||
             (action === "create" && !title.trim()) ||
             (action === "request_change" && !note.trim())
           }

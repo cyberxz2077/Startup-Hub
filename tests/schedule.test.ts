@@ -58,12 +58,11 @@ describe("schedule clock and safe meeting links", () => {
     expect(addDays("2026-12-31", 1)).toBe("2027-01-01");
     expect(slotIso("2026-10-26", "14:00")).toBe("2026-10-26T06:00:00.000Z");
   });
-  it("rejects past, long, cross-day, malformed-grid and beyond-month slots", () => {
+  it("accepts full-day windows and rejects past, cross-day, malformed-grid and beyond-month slots", () => {
     const now = new Date("2026-10-25T04:00:00Z");
     for (const [start, end] of [
       ["2026-10-25T03:00:00Z", "2026-10-25T03:30:00Z"],
       ["2026-11-25T06:00:00Z", "2026-11-25T06:30:00Z"],
-      ["2026-10-26T06:00:00Z", "2026-10-26T09:00:00Z"],
       ["2026-10-26T15:30:00Z", "2026-10-26T16:30:00Z"],
       ["2026-10-26T06:05:00Z", "2026-10-26T06:35:00Z"],
     ])
@@ -72,6 +71,27 @@ describe("schedule clock and safe meeting links", () => {
       validateSlot(
         new Date("2026-11-24T06:00:00Z"),
         new Date("2026-11-24T06:30:00Z"),
+        now,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSlot(
+        new Date(slotIso("2026-10-26", "00:00")),
+        new Date(slotIso("2026-10-26", "24:00")),
+        now,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSlot(
+        new Date(slotIso("2026-11-24", "23:45")),
+        new Date(slotIso("2026-11-24", "24:00")),
+        now,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateSlot(
+        new Date(slotIso("2026-10-26", "08:00")),
+        new Date(slotIso("2026-10-26", "20:30")),
         now,
       ),
     ).not.toThrow();

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const user = await requireSession();
-    const data = await readJson(request, preferenceSchema);
+    const data = await readJson(request, preferenceSchema, 250_000);
     await rateLimit(`schedule:${user.id}`, 30, 600);
     await savePreferences(user.id, data);
     return json(await ownSchedule(user.id));

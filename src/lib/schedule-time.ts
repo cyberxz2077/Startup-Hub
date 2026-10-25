@@ -1,14 +1,21 @@
 export const SCHEDULE_TIME_ZONE = "Asia/Shanghai";
 export const DAY = 86_400_000;
 export const MINUTE = 60_000;
+const dateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: SCHEDULE_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
+  timeZone: SCHEDULE_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
 
 export function scheduleDate(value: Date | string = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: SCHEDULE_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(value));
+  return dateFormatter.format(new Date(value));
 }
 
 export function addDays(date: string, days: number) {
@@ -27,12 +34,7 @@ export function slotIso(date: string, time: string) {
 }
 
 export function scheduleTime(value: Date | string) {
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: SCHEDULE_TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(value));
+  return timeFormatter.format(new Date(value));
 }
 
 export function formatSlot(startsAt: Date | string, endsAt: Date | string) {
@@ -43,7 +45,7 @@ export function formatSlot(startsAt: Date | string, endsAt: Date | string) {
     weekday: "short",
   }).format(
     new Date(startsAt),
-  )} ${scheduleTime(startsAt)}–${scheduleTime(endsAt)}`;
+  )} ${scheduleTime(startsAt)}–${scheduleDate(startsAt) !== scheduleDate(endsAt) && scheduleTime(endsAt) === "00:00" ? "24:00" : scheduleTime(endsAt)}`;
 }
 
 export function overlaps(
